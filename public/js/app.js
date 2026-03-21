@@ -30,7 +30,6 @@ const elements = {
 };
 
 const renderer = new GameRenderer(elements.canvas);
-const network = new MultiplayerClient();
 
 let activeMode = "menu";
 let soloGame = null;
@@ -38,6 +37,8 @@ let multiplayerState = null;
 let lastFrameAt = performance.now();
 let lastMultiplayerScore = 0;
 let suppressNextRoomLeft = false;
+let network = null;
+let networkEventsBound = false;
 
 function setActiveMode(mode) {
   activeMode = mode;
@@ -105,6 +106,31 @@ function setOverlay(visible, title, message) {
 function setRoomStatus(message, isError = false) {
   elements.roomStatus.textContent = message;
   elements.roomStatus.classList.toggle("error", isError);
+}
+
+function ensureNetwork({ silent = false } = {}) {
+  if (network) {
+    return network;
+  }
+
+  if (typeof window.io !== "function") {
+    if (!silent) {
+      setRoomStatus("Realtime service is still loading. Refresh if multiplayer stays unavailable.", true);
+    }
+    return null;
+  }
+
+  try {
+    network = new MultiplayerClient();
+    bindNetworkEvents(network);
+    return network;
+  } catch (error) {
+    console.error("Unable to start multiplayer client.", error);
+    if (!silent) {
+      setRoomStatus("Realtime service failed to start. Solo still works.", true);
+    }
+    return null;
+  }
 }
 
 function renderEffects(effects = []) {
@@ -234,7 +260,7 @@ function attachSoloListeners(game) {
 }
 
 function startSoloGame() {
-  if (network.roomCode) {
+  if (network?.roomCode) {
     suppressNextRoomLeft = true;
     network.leaveRoom();
   }
@@ -255,7 +281,12 @@ function startSoloGame() {
 
 function startCreateRoom() {
   persistName();
-  network.createRoom(getPlayerName());
+  const client = ensureNetwork();
+  if (!client) {
+    return;
+  }
+
+  client.createRoom(getPlayerName());
   setRoomStatus("Creating room...");
 }
 
@@ -267,7 +298,12 @@ function startJoinRoom() {
   }
 
   persistName();
-  network.joinRoom(code, getPlayerName());
+  const client = ensureNetwork();
+  if (!client) {
+    return;
+  }
+
+  client.joinRoom(code, getPlayerName());
   setRoomStatus(`Joining room ${code}...`);
 }
 
@@ -290,7 +326,7 @@ elements.joinRoomBtn.addEventListener("click", startJoinRoom);
 elements.refreshLeaderboardBtn.addEventListener("click", fetchLeaderboard);
 elements.leaveRoomBtn.addEventListener("click", () => {
   suppressNextRoomLeft = false;
-  network.leaveRoom();
+  network?.leaveRoom();
 });
 elements.playerName.addEventListener("change", persistName);
 elements.roomCodeInput.addEventListener("input", () => {
@@ -324,85 +360,93 @@ document.addEventListener("keydown", (event) => {
   }
 });
 
-network.on("roomCreated", ({ roomCode }) => {
-  setActiveMode("multiplayer");
-  setPlayingState(true);
-  elements.restartBtn.hidden = true;
-  elements.leaveRoomBtn.hidden = false;
-  soloGame = null;
-  lastMultiplayerScore = 0;
-  elements.roomCodeInput.value = roomCode;
-  setRoomStatus(`Room ${roomCode} created. Share the code and start moving.`);
-  setOverlay(false, "", "");
-  triggerArenaZoom();
-});
-
-network.on("roomJoined", ({ roomCode }) => {
-  setActiveMode("multiplayer");
-  setPlayingState(true);
-  elements.restartBtn.hidden = true;
-  elements.leaveRoomBtn.hidden = false;
-  soloGame = null;
-  lastMultiplayerScore = 0;
-  elements.roomCodeInput.value = roomCode;
-  setRoomStatus(`Joined room ${roomCode}. Watch for other snakes.`);
-  setOverlay(false, "", "");
-  triggerArenaZoom();
-});
-
-network.on("roomLeft", () => {
-  if (suppressNextRoomLeft) {
-    suppressNextRoomLeft = false;
+function bindNetworkEvents(client) {
+  if (networkEventsBound) {
     return;
   }
 
-  returnToMenu("Room left. Start solo or join a fresh arena.");
-  setRoomStatus("Start solo or create a room to challenge other snakes.");
-});
+  networkEventsBound = true;
 
-network.on("roomError", ({ message }) => {
-  setRoomStatus(message || "Room action failed.", true);
-});
-
-network.on("roomState", (state) => {
-  if (suppressNextRoomLeft) {
-    return;
-  }
-
-  multiplayerState = state;
-  setActiveMode("multiplayer");
-  setPlayingState(true);
-  updateHud(state.local, { modeLabel: "Multiplayer", roomCode: state.roomCode });
-
-  const localPlayer = state.players.find((player) => player.id === state.localPlayerId);
-  if (state.local.score > lastMultiplayerScore && localPlayer?.segments?.[0]) {
-    renderer.triggerBurst(localPlayer.segments[0], localPlayer.color, `+${state.local.score - lastMultiplayerScore}`);
-  }
-  lastMultiplayerScore = state.local.score;
-
-  if (!state.local.alive) {
-    setOverlay(true, "Eliminated", `${state.local.statusText} Score: ${state.local.score}.`);
-  } else if (state.winnerId === state.localPlayerId && state.players.length > 1 && state.aliveCount === 1) {
-    setOverlay(true, "Arena Won", `You survived room ${state.roomCode} with ${state.local.score} points.`);
-  } else {
+  client.on("roomCreated", ({ roomCode }) => {
+    setActiveMode("multiplayer");
+    setPlayingState(true);
+    elements.restartBtn.hidden = true;
+    elements.leaveRoomBtn.hidden = false;
+    soloGame = null;
+    lastMultiplayerScore = 0;
+    elements.roomCodeInput.value = roomCode;
+    setRoomStatus(`Room ${roomCode} created. Share the code and start moving.`);
     setOverlay(false, "", "");
-  }
-});
+    triggerArenaZoom();
+  });
 
-network.on("leaderboardUpdated", ({ board, entries }) => {
-  if (board && board !== "solo") {
-    return;
-  }
+  client.on("roomJoined", ({ roomCode }) => {
+    setActiveMode("multiplayer");
+    setPlayingState(true);
+    elements.restartBtn.hidden = true;
+    elements.leaveRoomBtn.hidden = false;
+    soloGame = null;
+    lastMultiplayerScore = 0;
+    elements.roomCodeInput.value = roomCode;
+    setRoomStatus(`Joined room ${roomCode}. Watch for other snakes.`);
+    setOverlay(false, "", "");
+    triggerArenaZoom();
+  });
 
-  renderLeaderboard(entries);
-});
+  client.on("roomLeft", () => {
+    if (suppressNextRoomLeft) {
+      suppressNextRoomLeft = false;
+      return;
+    }
 
-network.on("disconnect", () => {
-  if (activeMode === "multiplayer") {
-    setOverlay(true, "Disconnected", "Server connection dropped. Refresh to reconnect.");
-    setRoomStatus("Connection lost.", true);
-  }
-});
+    returnToMenu("Room left. Start solo or join a fresh arena.");
+    setRoomStatus("Start solo or create a room to challenge other snakes.");
+  });
+
+  client.on("roomError", ({ message }) => {
+    setRoomStatus(message || "Room action failed.", true);
+  });
+
+  client.on("roomState", (state) => {
+    if (suppressNextRoomLeft) {
+      return;
+    }
+
+    multiplayerState = state;
+    setActiveMode("multiplayer");
+    setPlayingState(true);
+    updateHud(state.local, { modeLabel: "Multiplayer", roomCode: state.roomCode });
+
+    const localPlayer = state.players.find((player) => player.id === state.localPlayerId);
+    if (state.local.score > lastMultiplayerScore && localPlayer?.segments?.[0]) {
+      renderer.triggerBurst(localPlayer.segments[0], localPlayer.color, `+${state.local.score - lastMultiplayerScore}`);
+    }
+    lastMultiplayerScore = state.local.score;
+
+    if (!state.local.alive) {
+      setOverlay(true, "Eliminated", `${state.local.statusText} Score: ${state.local.score}.`);
+    } else if (state.winnerId === state.localPlayerId && state.players.length > 1 && state.aliveCount === 1) {
+      setOverlay(true, "Arena Won", `You survived room ${state.roomCode} with ${state.local.score} points.`);
+    } else {
+      setOverlay(false, "", "");
+    }
+  });
+
+  client.on("leaderboardUpdated", ({ board, entries }) => {
+    if (board && board !== "solo") {
+      return;
+    }
+
+    renderLeaderboard(entries);
+  });
+
+  client.on("disconnect", () => {
+    if (activeMode === "multiplayer") {
+      setOverlay(true, "Disconnected", "Server connection dropped. Refresh to reconnect.");
+      setRoomStatus("Connection lost.", true);
+    }
+  });
+}
 
 function frame(now) {
   const delta = now - lastFrameAt;
@@ -431,4 +475,5 @@ renderLeaderboard([]);
 updateHud(null, { modeLabel: "Menu", roomCode: "-" });
 setOverlay(true, "Snake Dare Arena", "Classic snake with dares, power-ups, and room warfare.");
 fetchLeaderboard();
+ensureNetwork({ silent: true });
 window.requestAnimationFrame(frame);
