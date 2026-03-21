@@ -1,0 +1,14 @@
+{
+  "name": "snake-dare-arena",
+  "version": "1.0.0",
+  "description": "Snake Dare Arena browser game with solo and multiplayer modes",
+  "type": "module",
+  "main": "server.js",
+  "scripts": {
+    "start": "start-server.cmd"
+  },
+  "dependencies": {
+    "express": "^4.21.2",
+    "socket.io": "^4.8.1"
+  }
+}

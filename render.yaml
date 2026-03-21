@@ -1,0 +1,9 @@
+services:
+  - type: web
+    name: snake-dare-arena
+    runtime: node
+    plan: free
+    region: oregon
+    buildCommand: npm install
+    startCommand: node server.js
+    healthCheckPath: /health

@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Snake Dare Arena</title>
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body data-mode="menu" data-overlay="visible">
+    <main class="app-shell">
+      <section class="control-panel">
+        <div class="card launch-card">
+          <div class="card-header">
+            <span>Pilot Setup</span>
+            <strong>Deploy</strong>
+          </div>
+
+          <label class="field">
+            <span>Nickname</span>
+            <input id="playerName" type="text" maxlength="18" placeholder="Arena Snake" />
+          </label>
+
+          <div class="menu-actions">
+            <button id="soloBtn" class="accent">Start Solo Game</button>
+            <button id="createRoomBtn">Create Room</button>
+          </div>
+
+          <div class="join-row">
+            <input id="roomCodeInput" type="text" maxlength="6" placeholder="ROOM CODE" />
+            <button id="joinRoomBtn" class="ghost">Join Room</button>
+          </div>
+
+          <p id="roomStatus" class="inline-status">
+            Start solo or create a room to challenge other snakes.
+          </p>
+        </div>
+
+        <div class="card mission-card">
+          <div class="card-header">
+            <span>Mission Panel</span>
+            <strong id="modeValue">Menu</strong>
+          </div>
+
+          <div class="score-band">
+            <div class="score-stack">
+              <span>Score</span>
+              <strong id="scoreValue">0</strong>
+            </div>
+
+            <div class="score-stack room-stack">
+              <span>Room</span>
+              <strong id="roomCodeValue">-</strong>
+            </div>
+          </div>
+
+          <div class="stat">
+            <span>Target</span>
+            <strong id="targetValue">Warm up your reflexes.</strong>
+          </div>
+
+          <div class="stat">
+            <span>Active Dare</span>
+            <strong id="dareValue">Pick a mode to get your first challenge.</strong>
+          </div>
+
+          <div class="controls-ribbon">
+            <span>WASD / Arrows to move</span>
+            <span>Space restarts solo</span>
+          </div>
+
+          <div class="mission-actions">
+            <button id="leaveRoomBtn" class="ghost small" hidden>Leave Room</button>
+            <button id="restartBtn" class="accent small" hidden>Restart Solo</button>
+          </div>
+        </div>
+
+        <div class="card support-card">
+          <div class="support-grid">
+            <div class="support-cell">
+              <div class="card-header">
+                <span>Power Matrix</span>
+                <strong>Live</strong>
+              </div>
+              <div id="effectsList" class="effects-list">
+                <span class="empty-pill">No power-ups active</span>
+              </div>
+            </div>
+
+            <div class="support-cell">
+              <div class="card-header">
+                <span>Tactical Feed</span>
+                <strong>Recent</strong>
+              </div>
+              <div id="statusFeed" class="feed">
+                <p>Use WASD or arrow keys to move.</p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="card leaderboard-card">
+          <div class="card-header">
+            <span>Solo Leaderboard</span>
+            <button id="refreshLeaderboardBtn" class="ghost small">Refresh</button>
+          </div>
+          <ol id="leaderboardList" class="leaderboard-list"></ol>
+        </div>
+      </section>
+
+      <section class="arena-panel">
+        <div class="canvas-wrap card">
+          <div class="canvas-frame">
+            <canvas id="gameCanvas" width="616" height="616"></canvas>
+            <div class="canvas-glass"></div>
+            <div id="overlay" class="overlay">
+              <div class="overlay-kicker">Arena Broadcast</div>
+              <h2 id="overlayTitle">Snake Dare Arena</h2>
+              <p id="overlayMessage">Classic snake with dares, power-ups, and room warfare.</p>
+            </div>
+          </div>
+        </div>
+
+        <div class="card legend">
+          <span><i class="dot food"></i> Food charges your score</span>
+          <span><i class="dot speed"></i> Speed boost raises tempo</span>
+          <span><i class="dot shield"></i> Shield blocks one crash</span>
+          <span><i class="dot double"></i> Double score multiplies food</span>
+          <span><i class="dot player"></i> Your snake glows brighter</span>
+        </div>
+      </section>
+    </main>
+
+    <script src="/socket.io/socket.io.js"></script>
+    <script type="module" src="/js/app.js"></script>
+  </body>
+</html>
