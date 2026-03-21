@@ -11,8 +11,14 @@ Browser-based snake game with solo challenges, power-ups, and Socket.io multipla
 
 ## Deploy online on Render
 
-1. Push this project to a GitHub repository.
-2. Sign in to Render and create a new Web Service from that repo.
+Use the one-click button below after you create your Render account:
+
+[![Deploy to Render](https://render.com/images/deploy-to-render-button.svg)](https://render.com/deploy?repo=https://github.com/redvoltage021-del/snake-dare-arena)
+
+Manual path:
+
+1. Sign in to Render and connect your GitHub account.
+2. Create a new Blueprint or Web Service from `redvoltage021-del/snake-dare-arena`.
 3. Render can use the included `render.yaml`, or you can enter these settings manually:
    - Runtime: `node`
    - Build Command: `npm install`
