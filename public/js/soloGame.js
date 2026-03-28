@@ -20,6 +20,10 @@ import {
   sanitizeName
 } from "/shared/utils.js";
 
+const SOLO_COUNTDOWN_MS = 2200;
+const SOLO_MOVE_INTERVAL_FLOOR = 112;
+const SOLO_SPEED_INTERVAL_FLOOR = 76;
+
 function oppositeDirection(direction) {
   if (direction === "up") {
     return "down";
@@ -33,10 +37,15 @@ function oppositeDirection(direction) {
   return "left";
 }
 
+function cloneSegments(segments) {
+  return segments.map((segment) => ({ ...segment }));
+}
+
 export class SoloGame extends EventTarget {
-  constructor({ playerName = "You", rng = Math.random } = {}) {
+  constructor({ playerName = "You", snakeColor = "#27e1ff", rng = Math.random } = {}) {
     super();
     this.playerName = sanitizeName(playerName, "You");
+    this.snakeColor = snakeColor;
     this.rng = rng;
     this.reset();
   }
@@ -56,26 +65,31 @@ export class SoloGame extends EventTarget {
     const now = Date.now();
 
     this.snake = spawn.segments;
+    this.previousSnake = cloneSegments(spawn.segments);
     this.direction = spawn.direction;
-    this.nextDirection = spawn.direction;
     this.directionOpposite = oppositeDirection(spawn.direction);
+    this.turnQueue = [];
     this.score = 0;
     this.alive = true;
+    this.phase = "countdown";
     this.accumulator = 0;
+    this.moveProgress = 0;
     this.speedUntil = 0;
     this.doubleUntil = 0;
     this.shieldCharges = 0;
-    this.notifications = ["New run started."];
+    this.notifications = ["Launch in 3. Queue your opening turn."];
     this.gameOverReason = "";
     this.powerUp = null;
     this.food = this.spawnFood();
-    this.nextPowerUpAt = now + POWER_UP_SPAWN_INTERVAL_MS;
-    this.dare = createDare({ score: 0, now, rng: this.rng });
-    this.nextDareAt = now + POWER_UP_SPAWN_INTERVAL_MS;
+    this.countdownEndsAt = now + SOLO_COUNTDOWN_MS;
+    this.launchFlashUntil = this.countdownEndsAt + 360;
+    this.nextPowerUpAt = this.countdownEndsAt + POWER_UP_SPAWN_INTERVAL_MS;
+    this.dare = null;
+    this.nextDareAt = this.countdownEndsAt + 1800;
   }
 
   queueDirection(directionName) {
-    if (!this.alive) {
+    if (!this.alive || this.phase === "gameover") {
       return;
     }
 
@@ -83,18 +97,30 @@ export class SoloGame extends EventTarget {
       return;
     }
 
-    if (directionName === this.direction || directionName === this.directionOpposite) {
+    const lastQueued = this.turnQueue[this.turnQueue.length - 1] ?? this.direction;
+    if (directionName === lastQueued || directionName === oppositeDirection(lastQueued)) {
       return;
     }
 
-    this.nextDirection = directionName;
-    recordDareTurn(this.dare, directionName, Date.now());
-    this.resolveDare(Date.now());
+    this.turnQueue.push(directionName);
+    this.turnQueue = this.turnQueue.slice(-2);
   }
 
   update(deltaMs) {
     const now = Date.now();
     const cappedDelta = Math.min(200, deltaMs);
+
+    if (this.phase === "countdown") {
+      this.moveProgress = 0;
+      if (now >= this.countdownEndsAt) {
+        this.phase = "live";
+        this.dare = createDare({ score: this.score, now, rng: this.rng });
+        this.nextDareAt = now + POWER_UP_SPAWN_INTERVAL_MS;
+        this.addNotification("Go. Chain food and clear dares.");
+        this.emitEvent("impact", { intensity: 0.22, color: "#27e1ff", duration: 220 });
+      }
+      return;
+    }
 
     if (this.powerUp && now >= this.powerUp.expiresAt) {
       this.powerUp = null;
@@ -113,14 +139,25 @@ export class SoloGame extends EventTarget {
       }
     }
 
+    this.moveProgress = this.alive ? Math.min(1, this.accumulator / this.getMoveInterval(now)) : 1;
     this.resolveDare(now);
   }
 
   step(now) {
-    if (this.nextDirection && this.nextDirection !== this.directionOpposite) {
-      this.direction = this.nextDirection;
+    while (this.turnQueue.length) {
+      const directionName = this.turnQueue.shift();
+      if (directionName === this.direction || directionName === this.directionOpposite) {
+        continue;
+      }
+
+      this.direction = directionName;
+      recordDareTurn(this.dare, directionName, now);
+      this.resolveDare(now);
+      break;
     }
+
     this.directionOpposite = oppositeDirection(this.direction);
+    this.previousSnake = cloneSegments(this.snake);
 
     const vector = this.direction === "up"
       ? { x: 0, y: -1 }
@@ -142,6 +179,11 @@ export class SoloGame extends EventTarget {
       if (this.shieldCharges > 0) {
         this.shieldCharges -= 1;
         this.addNotification("Shield absorbed the crash.");
+        this.emitEvent("impact", {
+          intensity: 0.34,
+          color: POWER_UP_TYPES.shield.color,
+          duration: 180
+        });
         return;
       }
 
@@ -160,6 +202,7 @@ export class SoloGame extends EventTarget {
       this.food = this.spawnFood();
       this.addNotification(`Food collected for +${gain}.`);
       this.emitEvent("burst", { cell: nextHead, color: "#fde047" });
+      this.emitEvent("impact", { intensity: 0.16, color: "#fde047", duration: 140 });
 
       if (!this.powerUp && this.rng() < 0.42) {
         this.spawnPowerUp(now);
@@ -174,6 +217,7 @@ export class SoloGame extends EventTarget {
         color: POWER_UP_TYPES[type].color,
         label: POWER_UP_TYPES[type].name
       });
+      this.emitEvent("impact", { intensity: 0.24, color: POWER_UP_TYPES[type].color, duration: 180 });
       this.powerUp = null;
       this.nextPowerUpAt = now + POWER_UP_SPAWN_INTERVAL_MS;
     }
@@ -195,6 +239,11 @@ export class SoloGame extends EventTarget {
             cell: this.snake[0],
             color: reward.powerUp ? POWER_UP_TYPES[reward.powerUp].color : "#c084fc",
             label: `+${reward.points}`
+          });
+          this.emitEvent("impact", {
+            intensity: 0.28,
+            color: reward.powerUp ? POWER_UP_TYPES[reward.powerUp].color : "#c084fc",
+            duration: 200
           });
         }
         this.dare = null;
@@ -236,9 +285,12 @@ export class SoloGame extends EventTarget {
     }
 
     this.alive = false;
+    this.phase = "gameover";
+    this.moveProgress = 1;
     this.gameOverReason = reason;
     updateDare(this.dare, { now: Date.now(), score: this.score, alive: false });
     this.addNotification(reason);
+    this.emitEvent("impact", { intensity: 0.72, color: "#ff3d6e", duration: 360 });
     this.emitEvent("gameOver", { score: this.score, reason });
   }
 
@@ -248,7 +300,10 @@ export class SoloGame extends EventTarget {
   }
 
   getMoveInterval(now) {
-    return this.speedUntil > now ? SPEED_MOVE_INTERVAL : BASE_MOVE_INTERVAL;
+    const baseInterval = this.speedUntil > now ? SPEED_MOVE_INTERVAL : BASE_MOVE_INTERVAL;
+    const scoreRamp = Math.min(30, Math.floor(this.score * 1.4));
+    const floor = this.speedUntil > now ? SOLO_SPEED_INTERVAL_FLOOR : SOLO_MOVE_INTERVAL_FLOOR;
+    return Math.max(floor, baseInterval - scoreRamp);
   }
 
   getFoodScore(now) {
@@ -276,6 +331,16 @@ export class SoloGame extends EventTarget {
   }
 
   getLocalDare(now) {
+    if (this.phase === "countdown") {
+      return {
+        description: "Launch sequence active.",
+        target: `Run begins in ${formatTimeLeft(Math.max(0, this.countdownEndsAt - now))}`,
+        progress: "Queue your first turn and get ready.",
+        reward: "",
+        status: "countdown"
+      };
+    }
+
     if (this.dare) {
       return getDareHud(this.dare, now);
     }
@@ -320,6 +385,18 @@ export class SoloGame extends EventTarget {
   }
 
   getSnapshot(now = Date.now()) {
+    const countdownRemaining = Math.max(0, this.countdownEndsAt - now);
+    const countdownVisible = this.phase === "countdown" || now < this.launchFlashUntil;
+    const countdownLabel = countdownVisible
+      ? now >= this.countdownEndsAt
+        ? "GO"
+        : countdownRemaining > 1400
+          ? "3"
+          : countdownRemaining > 700
+            ? "2"
+            : "1"
+      : "";
+
     return {
       mode: "solo",
       food: this.food,
@@ -329,20 +406,30 @@ export class SoloGame extends EventTarget {
         {
           id: "solo",
           name: this.playerName,
-          color: "#22d3ee",
+          color: this.snakeColor,
           direction: this.direction,
           score: this.score,
           alive: this.alive,
-          segments: this.snake
+          segments: this.snake,
+          previousSegments: this.previousSnake,
+          moveProgress: this.moveProgress,
+          speeding: this.speedUntil > now
         }
       ],
       local: {
         score: this.score,
         alive: this.alive,
+        phase: this.phase,
+        countdownLabel,
+        countdownMs: countdownRemaining,
         dare: this.getLocalDare(now),
         activeEffects: this.getActiveEffects(now),
         notifications: this.notifications,
-        statusText: this.alive ? "Solo run live. Chain food and clear dares." : this.gameOverReason,
+        statusText: this.phase === "countdown"
+          ? "Launch sequence active."
+          : this.alive
+            ? "Solo run live. Chain food and clear dares."
+            : this.gameOverReason,
         shieldCharges: this.shieldCharges
       }
     };

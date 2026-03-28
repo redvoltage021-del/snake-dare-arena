@@ -9,7 +9,7 @@ export class RoomManager {
     this.socketRooms = new Map();
   }
 
-  createRoom(socket, name) {
+  createRoom(socket, playerProfile) {
     this.detachSocket(socket);
 
     const code = createRoomCode(new Set(this.rooms.keys()));
@@ -25,11 +25,11 @@ export class RoomManager {
     this.rooms.set(code, room);
     this.socketRooms.set(socket.id, code);
     socket.join(code);
-    room.addPlayer(socket, name);
+    room.addPlayer(socket, playerProfile);
     return room;
   }
 
-  joinRoom(socket, code, name) {
+  joinRoom(socket, code, playerProfile) {
     const roomCode = String(code || "").trim().toUpperCase();
     const room = this.rooms.get(roomCode);
 
@@ -40,7 +40,7 @@ export class RoomManager {
     this.detachSocket(socket);
     this.socketRooms.set(socket.id, roomCode);
     socket.join(roomCode);
-    room.addPlayer(socket, name);
+    room.addPlayer(socket, playerProfile);
     return room;
   }
 

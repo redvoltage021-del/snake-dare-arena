@@ -25,6 +25,10 @@ import {
   sanitizeName
 } from "../shared/utils.js";
 
+function cloneSegments(segments) {
+  return segments.map((segment) => ({ ...segment }));
+}
+
 export class MultiplayerRoom {
   constructor({ code, io, leaderboardManager, onEmpty }) {
     this.code = code;
@@ -39,16 +43,16 @@ export class MultiplayerRoom {
     this.lastTickAt = Date.now();
   }
 
-  addPlayer(socket, name) {
-    const profile = this.createPlayer(socket.id, name);
-    this.players.set(socket.id, profile);
+  addPlayer(socket, playerProfile) {
+    const player = this.createPlayer(socket.id, playerProfile);
+    this.players.set(socket.id, player);
 
     if (!this.food) {
       this.food = this.spawnFood();
     }
 
     this.ensureLoop();
-    this.pushMessage(profile, `Entered room ${this.code}.`);
+    this.pushMessage(player, `Entered room ${this.code}.`);
     this.broadcastState();
   }
 
@@ -114,14 +118,16 @@ export class MultiplayerRoom {
     }
   }
 
-  createPlayer(socketId, name) {
+  createPlayer(socketId, playerProfile = {}) {
     const spawn = this.findSpawnSnake();
     const now = Date.now();
     return {
       id: socketId,
-      name: sanitizeName(name, `Snake ${this.players.size + 1}`),
-      color: PLAYER_COLORS[this.players.size % PLAYER_COLORS.length],
+      userId: playerProfile.userId ?? null,
+      name: sanitizeName(playerProfile.displayName, `Snake ${this.players.size + 1}`),
+      color: playerProfile.snakeColor || PLAYER_COLORS[this.players.size % PLAYER_COLORS.length],
       segments: spawn.segments,
+      previousSegments: cloneSegments(spawn.segments),
       direction: spawn.direction,
       nextDirection: spawn.direction,
       directionOpposite: spawn.direction === "up"
@@ -219,6 +225,10 @@ export class MultiplayerRoom {
     }
 
     this.players.forEach((player) => this.resolveDareState(player, now));
+    const survivors = this.getAlivePlayers();
+    if (survivors.length === 1 && this.players.size > 1) {
+      this.submitScore(survivors[0], "Multiplayer");
+    }
     this.broadcastState(now);
   }
 
@@ -325,6 +335,7 @@ export class MultiplayerRoom {
         return;
       }
 
+      plan.player.previousSegments = cloneSegments(plan.player.segments);
       plan.player.segments.unshift(plan.nextHead);
 
       if (!plan.eatsFood) {
@@ -356,16 +367,21 @@ export class MultiplayerRoom {
   }
 
   submitScore(player, mode) {
-    if (player.scoreSubmitted || player.score <= 0) {
+    if (player.scoreSubmitted || player.score <= 0 || !player.userId) {
       return;
     }
 
     player.scoreSubmitted = true;
     this.leaderboardManager.record({
-      name: player.name,
+      userId: player.userId,
       score: player.score,
-      mode: `${mode} ${this.code}`
+      mode: `${mode} ${this.code}`,
+      won: mode === "Multiplayer" && this.getAlivePlayers().length <= 1
     });
+  }
+
+  getAlivePlayers() {
+    return [...this.players.values()].filter((player) => player.alive);
   }
 
   getFoodScore(player, now) {
@@ -471,9 +487,12 @@ export class MultiplayerRoom {
       name: entry.name,
       color: entry.color,
       segments: entry.segments,
+      previousSegments: entry.previousSegments,
       direction: entry.direction,
       score: entry.score,
-      alive: entry.alive
+      alive: entry.alive,
+      moveProgress: entry.alive ? Math.min(1, entry.accumulator / this.getMoveInterval(entry, now)) : 1,
+      speeding: entry.speedUntil > now
     }));
 
     const aliveCount = players.filter((entry) => entry.alive).length;

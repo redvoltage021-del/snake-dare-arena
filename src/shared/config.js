@@ -17,14 +17,18 @@ export const DARE_COOLDOWN_MS = 2400;
 export const MAX_LEADERBOARD_ENTRIES = 10;
 export const ROOM_CODE_LENGTH = 5;
 
-export const PLAYER_COLORS = [
+export const SNAKE_COLOR_OPTIONS = [
   "#27e1ff",
   "#ff7a18",
   "#78ff7a",
   "#ff3d6e",
   "#9a7bff",
-  "#ffe35a"
+  "#ffe35a",
+  "#19e2c0",
+  "#ff8f3a"
 ];
+
+export const PLAYER_COLORS = SNAKE_COLOR_OPTIONS;
 
 export const DIRECTIONS = {
   up: {

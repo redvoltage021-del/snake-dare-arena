@@ -8,100 +8,170 @@
   </head>
   <body data-mode="menu" data-overlay="visible">
     <main class="app-shell">
-      <section class="control-panel">
-        <div class="card launch-card">
+      <section class="sidebar">
+        <div class="card account-card">
           <div class="card-header">
-            <span>Pilot Setup</span>
-            <strong>Deploy</strong>
+            <span id="accountKicker">Pilot Account</span>
+            <strong id="accountTitle">Sign In</strong>
           </div>
 
-          <label class="field">
-            <span>Nickname</span>
-            <input id="playerName" type="text" maxlength="18" placeholder="Arena Snake" />
-          </label>
+          <div id="authPanel">
+            <div class="auth-switch">
+              <button id="showLoginBtn" class="switch-btn is-active" type="button">Sign In</button>
+              <button id="showRegisterBtn" class="switch-btn" type="button">Create Account</button>
+            </div>
+
+            <label class="field">
+              <span>Username</span>
+              <input id="authUsername" type="text" maxlength="18" placeholder="arenapilot" />
+            </label>
+
+            <label class="field">
+              <span>Password</span>
+              <input id="authPassword" type="password" maxlength="48" placeholder="Enter password" />
+            </label>
+
+            <div id="registerFields" hidden>
+              <label class="field">
+                <span>Display Name</span>
+                <input id="registerDisplayName" type="text" maxlength="18" placeholder="Arena Pilot" />
+              </label>
+
+              <div class="field">
+                <span>Snake Color</span>
+                <div id="authColorPicker" class="color-picker"></div>
+              </div>
+            </div>
+
+            <div class="auth-actions">
+              <button id="loginBtn" class="accent" type="button">Sign In</button>
+              <button id="registerBtn" class="accent" type="button" hidden>Create Account</button>
+            </div>
+
+            <p id="authStatus" class="inline-status">
+              Sign in to save your progress, color, and scores.
+            </p>
+          </div>
+
+          <div id="profilePanel" hidden>
+            <div class="identity-row">
+              <span id="profileColorBadge" class="identity-badge"></span>
+              <div class="identity-copy">
+                <strong id="profileDisplayName">Pilot</strong>
+                <span id="profileUsername">@pilot</span>
+              </div>
+            </div>
+
+            <div class="profile-stats">
+              <div class="stat-box">
+                <span>Solo Best</span>
+                <strong id="soloBestStat">0</strong>
+              </div>
+              <div class="stat-box">
+                <span>Total Runs</span>
+                <strong id="totalRunsStat">0</strong>
+              </div>
+              <div class="stat-box">
+                <span>Total Score</span>
+                <strong id="totalScoreStat">0</strong>
+              </div>
+              <div class="stat-box">
+                <span>Room Wins</span>
+                <strong id="multiplayerWinsStat">0</strong>
+              </div>
+            </div>
+
+            <label class="field">
+              <span>Display Name</span>
+              <input id="profileDisplayNameInput" type="text" maxlength="18" placeholder="Arena Pilot" />
+            </label>
+
+            <div class="field">
+              <span>Snake Color</span>
+              <div id="profileColorPicker" class="color-picker"></div>
+            </div>
+
+            <div class="auth-actions">
+              <button id="saveProfileBtn" class="accent" type="button">Save Profile</button>
+              <button id="logoutBtn" type="button">Log Out</button>
+            </div>
+
+            <p id="profileStatus" class="inline-status">Profile ready.</p>
+          </div>
+        </div>
+
+        <div class="card play-card">
+          <div class="card-header">
+            <span>Play</span>
+            <strong id="playStatusLabel">Locked</strong>
+          </div>
 
           <div class="menu-actions">
-            <button id="soloBtn" class="accent">Start Solo Game</button>
-            <button id="createRoomBtn">Create Room</button>
+            <button id="soloBtn" class="accent" type="button">Start Solo</button>
+            <button id="createRoomBtn" type="button">Create Room</button>
           </div>
 
           <div class="join-row">
             <input id="roomCodeInput" type="text" maxlength="6" placeholder="ROOM CODE" />
-            <button id="joinRoomBtn" class="ghost">Join Room</button>
+            <button id="joinRoomBtn" class="ghost" type="button">Join Room</button>
           </div>
 
           <p id="roomStatus" class="inline-status">
-            Start solo or create a room to challenge other snakes.
+            Sign in to unlock solo and multiplayer.
           </p>
         </div>
 
-        <div class="card mission-card">
+        <div class="card hud-card">
           <div class="card-header">
-            <span>Mission Panel</span>
+            <span>Run Data</span>
             <strong id="modeValue">Menu</strong>
           </div>
 
-          <div class="score-band">
-            <div class="score-stack">
+          <div class="hud-grid">
+            <div class="stat-box large">
               <span>Score</span>
               <strong id="scoreValue">0</strong>
             </div>
-
-            <div class="score-stack room-stack">
+            <div class="stat-box">
               <span>Room</span>
               <strong id="roomCodeValue">-</strong>
             </div>
           </div>
 
-          <div class="stat">
+          <div class="detail-block">
             <span>Target</span>
-            <strong id="targetValue">Warm up your reflexes.</strong>
+            <strong id="targetValue">Sign in and launch a run.</strong>
           </div>
 
-          <div class="stat">
+          <div class="detail-block">
             <span>Active Dare</span>
-            <strong id="dareValue">Pick a mode to get your first challenge.</strong>
+            <strong id="dareValue">Your current challenge will appear here.</strong>
           </div>
 
-          <div class="controls-ribbon">
-            <span>WASD / Arrows to move</span>
-            <span>Space restarts solo</span>
+          <div class="detail-block">
+            <span>Effects</span>
+            <div id="effectsList" class="effects-list">
+              <span class="empty-pill">No live effects</span>
+            </div>
+          </div>
+
+          <div class="detail-block">
+            <span>Feed</span>
+            <div id="statusFeed" class="feed">
+              <p>Pick a mode to start moving.</p>
+            </div>
           </div>
 
           <div class="mission-actions">
-            <button id="leaveRoomBtn" class="ghost small" hidden>Leave Room</button>
-            <button id="restartBtn" class="accent small" hidden>Restart Solo</button>
-          </div>
-        </div>
-
-        <div class="card support-card">
-          <div class="support-grid">
-            <div class="support-cell">
-              <div class="card-header">
-                <span>Power Matrix</span>
-                <strong>Live</strong>
-              </div>
-              <div id="effectsList" class="effects-list">
-                <span class="empty-pill">No power-ups active</span>
-              </div>
-            </div>
-
-            <div class="support-cell">
-              <div class="card-header">
-                <span>Tactical Feed</span>
-                <strong>Recent</strong>
-              </div>
-              <div id="statusFeed" class="feed">
-                <p>Use WASD or arrow keys to move.</p>
-              </div>
-            </div>
+            <button id="leaveRoomBtn" class="ghost small" type="button" hidden>Leave Room</button>
+            <button id="restartBtn" class="accent small" type="button" hidden>Restart Solo</button>
           </div>
         </div>
 
         <div class="card leaderboard-card">
           <div class="card-header">
             <span>Solo Leaderboard</span>
-            <button id="refreshLeaderboardBtn" class="ghost small">Refresh</button>
+            <button id="refreshLeaderboardBtn" class="ghost small" type="button">Refresh</button>
           </div>
           <ol id="leaderboardList" class="leaderboard-list"></ol>
         </div>
@@ -113,19 +183,11 @@
             <canvas id="gameCanvas" width="616" height="616"></canvas>
             <div class="canvas-glass"></div>
             <div id="overlay" class="overlay">
-              <div class="overlay-kicker">Arena Broadcast</div>
+              <div class="overlay-kicker">Arena</div>
               <h2 id="overlayTitle">Snake Dare Arena</h2>
-              <p id="overlayMessage">Classic snake with dares, power-ups, and room warfare.</p>
+              <p id="overlayMessage">Sign in, choose your snake color, then launch a run.</p>
             </div>
           </div>
-        </div>
-
-        <div class="card legend">
-          <span><i class="dot food"></i> Food charges your score</span>
-          <span><i class="dot speed"></i> Speed boost raises tempo</span>
-          <span><i class="dot shield"></i> Shield blocks one crash</span>
-          <span><i class="dot double"></i> Double score multiplies food</span>
-          <span><i class="dot player"></i> Your snake glows brighter</span>
         </div>
       </section>
     </main>

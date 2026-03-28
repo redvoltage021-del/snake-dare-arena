@@ -1,0 +1,32 @@
+{
+  "users": [
+    {
+      "id": "fc9e86b8-4808-4c7f-9cb7-17f441498d53",
+      "username": "arena_test",
+      "usernameKey": "arena_test",
+      "displayName": "Arena Test",
+      "snakeColor": "#19e2c0",
+      "createdAt": "2026-03-28T07:52:22.059Z",
+      "updatedAt": "2026-03-28T07:52:22.432Z",
+      "passwordSalt": "fac8bb676fafdab89a7f743b2e2d1516",
+      "passwordHash": "fa105aa5d9ddce783e0551697841dda7a2407908dc5bed0e9e14bedfc2ba6b2fd12e3fbffaa5379f478f7f7ee90fe3f5484d7632738898a67255b95f2748e632",
+      "stats": {
+        "totalRuns": 1,
+        "totalScore": 7,
+        "solo": {
+          "bestScore": 7,
+          "lastScore": 7,
+          "runs": 1,
+          "lastPlayedAt": "2026-03-28T07:52:22.432Z"
+        },
+        "multiplayer": {
+          "bestScore": 0,
+          "lastScore": 0,
+          "runs": 0,
+          "wins": 0,
+          "lastPlayedAt": null
+        }
+      }
+    }
+  ]
+}
