@@ -11,13 +11,17 @@ function clamp(value, min, max) {
   return Math.max(min, Math.min(max, value));
 }
 
+function lerp(start, end, amount) {
+  return start + (end - start) * amount;
+}
+
 function hexToRgb(hex) {
   const clean = hex.replace("#", "");
   const normalized = clean.length === 3
     ? clean.split("").map((part) => `${part}${part}`).join("")
     : clean;
-
   const value = Number.parseInt(normalized, 16);
+
   return {
     r: (value >> 16) & 255,
     g: (value >> 8) & 255,
@@ -90,6 +94,20 @@ function truncateText(context, text, maxWidth) {
   return `${shortened}...`;
 }
 
+function getRenderedSegments(player) {
+  const segments = player.segments ?? [];
+  const previousSegments = player.previousSegments ?? segments;
+  const progress = clamp(player.moveProgress ?? 1, 0, 1);
+
+  return segments.map((segment, index) => {
+    const previous = previousSegments[index] ?? segment;
+    return {
+      x: lerp(previous.x, segment.x, progress),
+      y: lerp(previous.y, segment.y, progress)
+    };
+  });
+}
+
 export class GameRenderer {
   constructor(canvas) {
     this.canvas = canvas;
@@ -98,12 +116,9 @@ export class GameRenderer {
     this.lastFrameAt = performance.now();
     this.scaleX = 1;
     this.scaleY = 1;
-    this.starField = Array.from({ length: 40 }, (_, index) => ({
-      x: ((index * 73) % 1000) / 1000,
-      y: ((index * 191) % 1000) / 1000,
-      size: 1 + ((index * 17) % 3),
-      alpha: 0.16 + (((index * 29) % 100) / 100) * 0.18
-    }));
+    this.trauma = 0;
+    this.flashColor = null;
+    this.flashUntil = 0;
 
     this.resize = this.resize.bind(this);
     if (typeof ResizeObserver !== "undefined") {
@@ -164,17 +179,36 @@ export class GameRenderer {
     }
   }
 
+  triggerImpact({ intensity = 0.24, color = "#ffffff", duration = 180 } = {}) {
+    this.trauma = Math.max(this.trauma, clamp(intensity, 0, 1));
+    this.flashColor = color;
+    this.flashUntil = performance.now() + duration;
+  }
+
   draw(snapshot, { now = performance.now(), localPlayerId = null } = {}) {
     const deltaSeconds = Math.min(0.05, (now - this.lastFrameAt) / 1000);
     this.lastFrameAt = now;
     this.updateParticles(deltaSeconds);
     this.resize();
+
+    const localPlayer = snapshot?.players?.find((player) => player.id === localPlayerId) ?? null;
+    const shake = this.getShakeOffset(now);
+
     this.context.setTransform(1, 0, 0, 1, 0, 0);
     this.context.clearRect(0, 0, this.canvas.width, this.canvas.height);
-    this.context.setTransform(this.scaleX, 0, 0, this.scaleY, 0, 0);
-    this.drawBackdrop(now);
-    this.drawGrid(now);
-    this.drawArenaSweep(now);
+    this.context.setTransform(
+      this.scaleX,
+      0,
+      0,
+      this.scaleY,
+      shake.x * this.scaleX,
+      shake.y * this.scaleY
+    );
+
+    this.drawBackdrop(now, snapshot, localPlayer);
+    this.drawGrid(now, localPlayer);
+    this.drawArenaSweep(now, localPlayer);
+    this.drawArenaBorder(now, snapshot, localPlayer);
 
     if (snapshot?.food) {
       this.drawFood(snapshot.food, now);
@@ -192,7 +226,12 @@ export class GameRenderer {
       this.drawIdleMessage();
     }
 
+    if (snapshot?.local?.countdownLabel) {
+      this.drawCountdown(snapshot.local, now);
+    }
+
     this.drawParticles();
+    this.drawFlash(now);
     this.drawVignette();
   }
 
@@ -216,6 +255,7 @@ export class GameRenderer {
   }
 
   updateParticles(deltaSeconds) {
+    this.trauma = Math.max(0, this.trauma - deltaSeconds * 1.75);
     this.particles = this.particles
       .map((particle) => ({
         ...particle,
@@ -227,77 +267,55 @@ export class GameRenderer {
       .filter((particle) => particle.life > 0);
   }
 
-  drawBackdrop(now) {
-    const gradient = this.context.createLinearGradient(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
-    gradient.addColorStop(0, "#091019");
-    gradient.addColorStop(0.55, "#101729");
-    gradient.addColorStop(1, "#060914");
-    this.context.fillStyle = gradient;
-    this.context.fillRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
+  getShakeOffset(now) {
+    if (this.trauma <= 0.001) {
+      return { x: 0, y: 0 };
+    }
 
-    const hotGlow = this.context.createRadialGradient(
-      CANVAS_WIDTH * 0.12,
-      CANVAS_HEIGHT * 0.84,
-      0,
-      CANVAS_WIDTH * 0.12,
-      CANVAS_HEIGHT * 0.84,
-      240
-    );
-    hotGlow.addColorStop(0, "rgba(255, 122, 24, 0.22)");
-    hotGlow.addColorStop(1, "rgba(255, 122, 24, 0)");
-    this.context.fillStyle = hotGlow;
-    this.context.fillRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
+    const strength = this.trauma * this.trauma * 7;
+    return {
+      x: Math.sin(now / 22) * strength,
+      y: Math.cos(now / 18) * strength * 0.72
+    };
+  }
 
-    const coolGlow = this.context.createRadialGradient(
-      CANVAS_WIDTH * 0.84,
-      CANVAS_HEIGHT * 0.16,
-      0,
-      CANVAS_WIDTH * 0.84,
-      CANVAS_HEIGHT * 0.16,
-      220
-    );
-    coolGlow.addColorStop(0, "rgba(39, 225, 255, 0.22)");
-    coolGlow.addColorStop(1, "rgba(68, 213, 244, 0)");
-    this.context.fillStyle = coolGlow;
+  drawBackdrop(now, snapshot, localPlayer) {
+    const speedGlow = localPlayer?.speeding ? 0.26 : 0.16;
+    const countdownGlow = snapshot?.local?.countdownLabel ? 0.18 : 0;
+    this.context.fillStyle = "#082026";
     this.context.fillRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
-
-    this.starField.forEach((star, index) => {
-      this.context.save();
-      this.context.globalAlpha = star.alpha + Math.sin(now / 900 + index) * 0.05;
-      this.context.fillStyle = index % 3 === 0 ? "#ffe35a" : "#74ecff";
-      this.context.fillRect(
-        star.x * CANVAS_WIDTH,
-        star.y * CANVAS_HEIGHT,
-        star.size,
-        star.size
-      );
-      this.context.restore();
-    });
 
     this.context.save();
-    this.context.globalAlpha = 0.05;
-    this.context.strokeStyle = "#ffffff";
-    for (let offset = -CANVAS_HEIGHT; offset < CANVAS_WIDTH; offset += 42) {
-      this.context.beginPath();
-      this.context.moveTo(offset, 0);
-      this.context.lineTo(offset + CANVAS_HEIGHT, CANVAS_HEIGHT);
-      this.context.stroke();
-    }
+    this.context.globalAlpha = 0.12 + countdownGlow;
+    this.context.fillStyle = "#ff8a2b";
+    this.context.beginPath();
+    this.context.arc(CANVAS_WIDTH * 0.12, CANVAS_HEIGHT * 0.84, 150, 0, Math.PI * 2);
+    this.context.fill();
+    this.context.restore();
+
+    this.context.save();
+    this.context.globalAlpha = speedGlow;
+    this.context.fillStyle = "#25e3c7";
+    this.context.beginPath();
+    this.context.arc(CANVAS_WIDTH * 0.86, CANVAS_HEIGHT * 0.16, 165, 0, Math.PI * 2);
+    this.context.fill();
     this.context.restore();
   }
 
-  drawGrid(now) {
+  drawGrid(now, localPlayer) {
     for (let row = 0; row < GRID_HEIGHT; row += 1) {
       for (let column = 0; column < GRID_WIDTH; column += 1) {
-      this.context.fillStyle = (row + column) % 2 === 0
+        this.context.fillStyle = (row + column) % 2 === 0
           ? "rgba(255, 255, 255, 0.014)"
-          : "rgba(39, 225, 255, 0.026)";
+          : localPlayer?.speeding
+            ? "rgba(39, 225, 255, 0.038)"
+            : "rgba(39, 225, 255, 0.025)";
         this.context.fillRect(column * CELL_SIZE, row * CELL_SIZE, CELL_SIZE, CELL_SIZE);
       }
     }
 
     this.context.save();
-    this.context.strokeStyle = "rgba(122, 153, 179, 0.1)";
+    this.context.strokeStyle = "rgba(124, 158, 188, 0.1)";
     this.context.lineWidth = 1;
 
     for (let column = 0; column <= GRID_WIDTH; column += 1) {
@@ -314,20 +332,38 @@ export class GameRenderer {
       this.context.stroke();
     }
 
-    this.context.globalAlpha = 0.22 + Math.sin(now / 700) * 0.03;
-    this.context.strokeStyle = "rgba(116, 236, 255, 0.34)";
+    this.context.globalAlpha = 0.18 + Math.sin(now / 750) * 0.03;
+    this.context.strokeStyle = localPlayer?.speeding ? "rgba(255, 122, 24, 0.42)" : "rgba(116, 236, 255, 0.36)";
     this.context.strokeRect(1.5, 1.5, CANVAS_WIDTH - 3, CANVAS_HEIGHT - 3);
     this.context.restore();
   }
 
-  drawArenaSweep(now) {
-    const sweepY = (now * 0.08) % (CANVAS_HEIGHT + 120) - 60;
-    const sweep = this.context.createLinearGradient(0, sweepY - 36, 0, sweepY + 36);
-    sweep.addColorStop(0, "rgba(68, 213, 244, 0)");
-    sweep.addColorStop(0.5, "rgba(39, 225, 255, 0.08)");
-    sweep.addColorStop(1, "rgba(68, 213, 244, 0)");
-    this.context.fillStyle = sweep;
-    this.context.fillRect(0, sweepY - 36, CANVAS_WIDTH, 72);
+  drawArenaSweep(now, localPlayer) {
+    const sweepY = (now * (localPlayer?.speeding ? 0.14 : 0.08)) % (CANVAS_HEIGHT + 120) - 60;
+    this.context.save();
+    this.context.globalAlpha = localPlayer?.speeding ? 0.12 : 0.08;
+    this.context.fillStyle = localPlayer?.speeding ? "#ff8a2b" : "#25e3c7";
+    this.context.fillRect(0, sweepY - 28, CANVAS_WIDTH, 56);
+    this.context.restore();
+  }
+
+  drawArenaBorder(now, snapshot, localPlayer) {
+    const dangerAlpha = snapshot?.local?.alive === false ? 0.34 : 0;
+    const shielded = snapshot?.local?.shieldCharges > 0 ? 0.18 : 0;
+    const speeded = localPlayer?.speeding ? 0.2 : 0.08;
+
+    this.context.save();
+    this.context.lineWidth = 3;
+    this.context.strokeStyle = `rgba(255, 255, 255, ${0.03 + Math.sin(now / 540) * 0.015})`;
+    this.context.strokeRect(5, 5, CANVAS_WIDTH - 10, CANVAS_HEIGHT - 10);
+
+    if (dangerAlpha > 0 || shielded > 0 || speeded > 0) {
+      const tint = dangerAlpha > 0 ? "#ff3d6e" : shielded > 0 ? "#78ff7a" : "#ff7a18";
+      this.context.strokeStyle = rgba(tint, Math.max(dangerAlpha, shielded, speeded));
+      this.context.lineWidth = 5;
+      this.context.strokeRect(7, 7, CANVAS_WIDTH - 14, CANVAS_HEIGHT - 14);
+    }
+    this.context.restore();
   }
 
   drawFood(food, now) {
@@ -341,6 +377,13 @@ export class GameRenderer {
     this.context.beginPath();
     this.context.arc(centerX, centerY, pulse + 7, 0, Math.PI * 2);
     this.context.fill();
+
+    this.context.globalAlpha = 0.18;
+    this.context.strokeStyle = "#ffe35a";
+    this.context.lineWidth = 2;
+    this.context.beginPath();
+    this.context.arc(centerX, centerY, pulse + 11 + Math.sin(now / 240) * 1.6, 0, Math.PI * 2);
+    this.context.stroke();
 
     this.context.globalAlpha = 1;
     this.context.fillStyle = "#ffeb67";
@@ -378,6 +421,11 @@ export class GameRenderer {
     this.context.arc(0, 0, 15, 0, Math.PI * 2);
     this.context.stroke();
 
+    this.context.beginPath();
+    this.context.arc(0, 0, 21 + Math.sin(now / 220) * 2.2, 0, Math.PI * 2);
+    this.context.strokeStyle = rgba(power.color, 0.12);
+    this.context.stroke();
+
     this.context.rotate(spin);
     this.context.fillStyle = rgba(power.color, 0.18);
     drawHexagon(this.context, 0, 0, 14);
@@ -405,13 +453,14 @@ export class GameRenderer {
       return;
     }
 
+    const renderedSegments = getRenderedSegments(player);
     const glowColor = isLocalPlayer ? "#ffffff" : player.color;
-    const head = player.segments[0];
+    const head = renderedSegments[0];
     const pulse = 0.9 + Math.sin(now / 220) * 0.08;
 
     if (isLocalPlayer) {
       this.context.save();
-      this.context.strokeStyle = rgba("#ffffff", 0.11);
+      this.context.strokeStyle = rgba(player.speeding ? "#ff7a18" : "#ffffff", 0.12);
       this.context.lineWidth = 2;
       this.context.beginPath();
       this.context.arc(
@@ -425,19 +474,19 @@ export class GameRenderer {
       this.context.restore();
     }
 
-    player.segments
+    renderedSegments
       .slice()
       .reverse()
       .forEach((segment, index) => {
-        const fromTail = index / Math.max(1, player.segments.length - 1);
+        const fromTail = index / Math.max(1, renderedSegments.length - 1);
         const x = segment.x * CELL_SIZE + 2;
         const y = segment.y * CELL_SIZE + 2;
         const size = CELL_SIZE - 4;
         const outerColor = mixColor(player.color, "#041019", fromTail * 0.36);
-        const innerColor = mixColor(player.color, "#ffffff", isLocalPlayer ? 0.2 + fromTail * 0.1 : 0.08);
+        const innerColor = mixColor(player.color, "#ffffff", isLocalPlayer ? 0.22 + fromTail * 0.1 : 0.08);
 
         this.context.save();
-        this.context.shadowBlur = isLocalPlayer ? 14 : 8;
+        this.context.shadowBlur = isLocalPlayer ? 15 : 8;
         this.context.shadowColor = rgba(glowColor, isLocalPlayer ? 0.34 : 0.18);
         this.context.fillStyle = outerColor;
         drawRoundedRect(this.context, x, y, size, size, 7);
@@ -552,6 +601,36 @@ export class GameRenderer {
     this.context.restore();
   }
 
+  drawCountdown(localState, now) {
+    const scale = 1 + Math.sin(now / 140) * 0.04;
+
+    this.context.save();
+    this.context.translate(CANVAS_WIDTH / 2, CANVAS_HEIGHT / 2 - 10);
+    this.context.scale(scale, scale);
+
+    this.context.strokeStyle = "rgba(39, 225, 255, 0.2)";
+    this.context.lineWidth = 3;
+    this.context.beginPath();
+    this.context.arc(0, 0, 64, 0, Math.PI * 2);
+    this.context.stroke();
+
+    this.context.strokeStyle = "rgba(255, 122, 24, 0.24)";
+    this.context.beginPath();
+    this.context.arc(0, 0, 80 + Math.sin(now / 110) * 3, 0, Math.PI * 2);
+    this.context.stroke();
+
+    this.context.textAlign = "center";
+    this.context.textBaseline = "middle";
+    this.context.fillStyle = "#f7fbff";
+    this.context.font = "bold 72px Rockwell";
+    this.context.fillText(localState.countdownLabel, 0, -2);
+
+    this.context.fillStyle = "rgba(210, 223, 236, 0.9)";
+    this.context.font = "14px Bahnschrift";
+    this.context.fillText("Line up your opening route", 0, 42);
+    this.context.restore();
+  }
+
   drawIdleMessage() {
     this.context.save();
     this.context.textAlign = "center";
@@ -591,18 +670,25 @@ export class GameRenderer {
     });
   }
 
-  drawVignette() {
-    const vignette = this.context.createRadialGradient(
-      CANVAS_WIDTH / 2,
-      CANVAS_HEIGHT / 2,
-      CANVAS_HEIGHT * 0.16,
-      CANVAS_WIDTH / 2,
-      CANVAS_HEIGHT / 2,
-      CANVAS_HEIGHT * 0.7
-    );
-    vignette.addColorStop(0, "rgba(0, 0, 0, 0)");
-    vignette.addColorStop(1, "rgba(0, 0, 0, 0.32)");
-    this.context.fillStyle = vignette;
+  drawFlash(now) {
+    if (!this.flashColor || now >= this.flashUntil) {
+      return;
+    }
+
+    const remaining = (this.flashUntil - now) / 220;
+    this.context.save();
+    this.context.fillStyle = rgba(this.flashColor, clamp(remaining * 0.12, 0, 0.12));
     this.context.fillRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
+    this.context.restore();
+  }
+
+  drawVignette() {
+    this.context.save();
+    this.context.fillStyle = "rgba(0, 0, 0, 0.2)";
+    this.context.fillRect(0, 0, CANVAS_WIDTH, 16);
+    this.context.fillRect(0, CANVAS_HEIGHT - 16, CANVAS_WIDTH, 16);
+    this.context.fillRect(0, 0, 16, CANVAS_HEIGHT);
+    this.context.fillRect(CANVAS_WIDTH - 16, 0, 16, CANVAS_HEIGHT);
+    this.context.restore();
   }
 }
