@@ -1,6 +1,6 @@
 services:
   - type: web
-    name: snake-dare-arena
+    name: snake lodu
     runtime: node
     plan: free
     region: oregon
