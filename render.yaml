@@ -1,9 +1,6 @@
 services:
   - type: web
-    name: snake lodu
-    runtime: node
-    plan: free
-    region: oregon
+    name: snake-lodu
+    env: node
     buildCommand: npm install
-    startCommand: node server.js
-    healthCheckPath: /health
+    startCommand: npm start
