@@ -4,21 +4,21 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Snake Dare Arena</title>
-    <link rel="stylesheet" href="/styles.css" />
+    <link rel="stylesheet" href="/styles.css?v=20260328c" />
   </head>
   <body data-mode="menu" data-overlay="visible">
     <main class="app-shell">
       <section class="sidebar">
         <div class="card account-card">
           <div class="card-header">
-            <span id="accountKicker">Pilot Account</span>
+            <span id="accountKicker">This Device</span>
             <strong id="accountTitle">Sign In</strong>
           </div>
 
           <div id="authPanel">
             <div class="auth-switch">
               <button id="showLoginBtn" class="switch-btn is-active" type="button">Sign In</button>
-              <button id="showRegisterBtn" class="switch-btn" type="button">Create Account</button>
+              <button id="showRegisterBtn" class="switch-btn" type="button">Create Profile</button>
             </div>
 
             <label class="field">
@@ -45,12 +45,19 @@
 
             <div class="auth-actions">
               <button id="loginBtn" class="accent" type="button">Sign In</button>
-              <button id="registerBtn" class="accent" type="button" hidden>Create Account</button>
+              <button id="registerBtn" class="accent" type="button" hidden>Create Profile</button>
             </div>
 
             <p id="authStatus" class="inline-status">
-              Sign in to save your progress, color, and scores.
+              Create or sign into a profile saved on this device. You can use the username or tap a saved profile below.
             </p>
+
+            <div id="savedProfilesBlock" class="saved-profiles" hidden>
+              <div class="detail-block compact">
+                <span>Saved On This Device</span>
+                <div id="savedProfilesList" class="saved-profiles-list"></div>
+              </div>
+            </div>
           </div>
 
           <div id="profilePanel" hidden>
@@ -96,7 +103,7 @@
               <button id="logoutBtn" type="button">Log Out</button>
             </div>
 
-            <p id="profileStatus" class="inline-status">Profile ready.</p>
+            <p id="profileStatus" class="inline-status">Profile stored on this device.</p>
           </div>
         </div>
 
@@ -117,7 +124,7 @@
           </div>
 
           <p id="roomStatus" class="inline-status">
-            Sign in to unlock solo and multiplayer.
+            Sign in on this device to unlock solo and multiplayer.
           </p>
         </div>
 
@@ -140,7 +147,7 @@
 
           <div class="detail-block">
             <span>Target</span>
-            <strong id="targetValue">Sign in and launch a run.</strong>
+            <strong id="targetValue">Sign in on this device and launch a run.</strong>
           </div>
 
           <div class="detail-block">
@@ -170,8 +177,8 @@
 
         <div class="card leaderboard-card">
           <div class="card-header">
-            <span>Solo Leaderboard</span>
-            <button id="refreshLeaderboardBtn" class="ghost small" type="button">Refresh</button>
+            <span>This Device Leaderboard</span>
+            <button id="refreshLeaderboardBtn" class="ghost small" type="button">Reload</button>
           </div>
           <ol id="leaderboardList" class="leaderboard-list"></ol>
         </div>
@@ -180,12 +187,12 @@
       <section class="arena-panel">
         <div class="canvas-wrap card">
           <div class="canvas-frame">
-            <canvas id="gameCanvas" width="616" height="616"></canvas>
+            <canvas id="gameCanvas" width="616" height="616" tabindex="0"></canvas>
             <div class="canvas-glass"></div>
             <div id="overlay" class="overlay">
               <div class="overlay-kicker">Arena</div>
               <h2 id="overlayTitle">Snake Dare Arena</h2>
-              <p id="overlayMessage">Sign in, choose your snake color, then launch a run.</p>
+              <p id="overlayMessage">Sign in on this device, choose your snake color, then launch a run.</p>
             </div>
           </div>
         </div>
@@ -193,6 +200,6 @@
     </main>
 
     <script src="/socket.io/socket.io.js"></script>
-    <script type="module" src="/js/app.js"></script>
+    <script type="module" src="/js/app.js?v=20260328c"></script>
   </body>
 </html>

@@ -367,11 +367,16 @@ export class MultiplayerRoom {
   }
 
   submitScore(player, mode) {
-    if (player.scoreSubmitted || player.score <= 0 || !player.userId) {
+    if (player.scoreSubmitted) {
       return;
     }
 
     player.scoreSubmitted = true;
+
+    if (player.score < 0 || !this.leaderboardManager?.record || !player.userId) {
+      return;
+    }
+
     this.leaderboardManager.record({
       userId: player.userId,
       score: player.score,

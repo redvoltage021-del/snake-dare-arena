@@ -29,11 +29,14 @@
 
 html {
   color-scheme: dark;
+  scroll-behavior: smooth;
+  overflow-y: auto;
 }
 
 body {
   margin: 0;
   min-height: 100svh;
+  overflow-y: auto;
   background: var(--bg);
   color: var(--text);
   font-family: var(--ui-font);
@@ -93,6 +96,10 @@ body::after {
   min-width: 0;
 }
 
+.arena-panel {
+  align-self: start;
+}
+
 .card {
   border: 1px solid var(--line);
   border-radius: 22px;
@@ -115,6 +122,8 @@ body::after {
 
 .leaderboard-card {
   background: #11303a;
+  scroll-margin-top: 20px;
+  scroll-margin-bottom: 20px;
 }
 
 .canvas-wrap {
@@ -333,6 +342,10 @@ button.small,
   margin-top: 16px;
 }
 
+.detail-block.compact {
+  margin-top: 14px;
+}
+
 .detail-block strong {
   font-size: 1rem;
   line-height: 1.45;
@@ -426,6 +439,70 @@ button.small,
   gap: 10px;
 }
 
+.saved-profiles {
+  margin-top: 14px;
+}
+
+.saved-profiles-list {
+  display: grid;
+  gap: 10px;
+}
+
+.saved-profile {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  width: 100%;
+  padding: 12px 14px;
+  border-radius: 16px;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  background: var(--panel-muted);
+  color: var(--text);
+  text-align: left;
+}
+
+.saved-profile-copy {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.saved-profile-copy strong,
+.saved-profile-copy span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.saved-profile-copy span {
+  color: var(--muted);
+  font-size: 0.82rem;
+  font-weight: 500;
+}
+
+.saved-profile-accent {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+
+.saved-profile-dot {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: var(--profile-color, var(--accent-cool));
+  box-shadow: 0 0 0 5px rgba(255, 255, 255, 0.04);
+}
+
+.saved-profile-hint {
+  color: var(--accent-cool);
+  font-size: 0.8rem;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
 .color-chip {
   width: 34px;
   height: 34px;
@@ -499,6 +576,8 @@ button.small,
   width: min(100%, calc(100svh - 86px));
   aspect-ratio: 1 / 1;
   margin: 0 auto;
+  scroll-margin-top: 20px;
+  scroll-margin-bottom: 20px;
   border-radius: 18px;
   background: var(--arena-frame);
   border: 1px solid var(--line-strong);
@@ -575,32 +654,46 @@ canvas {
 }
 
 body[data-playing="true"] .app-shell {
-  height: 100svh;
-  grid-template-columns: minmax(280px, 350px) minmax(0, 1fr);
+  min-height: 100svh;
+  grid-template-columns: minmax(0, 1fr);
   align-items: start;
-  padding: 12px 0 14px;
+  justify-items: center;
+  padding: 0 0 24px;
 }
 
 body[data-playing="true"] .sidebar,
 body[data-playing="true"] .arena-panel {
   min-height: 0;
+  width: min(100%, 980px);
 }
 
 body[data-playing="true"] .sidebar {
-  overflow: auto;
-  padding-right: 4px;
+  overflow: visible;
+  padding-right: 0;
 }
 
+body[data-playing="true"] .account-card,
+body[data-playing="true"] .play-card,
 body[data-playing="true"] .leaderboard-card {
   display: none;
 }
 
+body[data-playing="true"] .arena-panel {
+  order: -1;
+  min-height: 100svh;
+  align-content: center;
+  justify-items: center;
+}
+
 body[data-playing="true"] .canvas-wrap {
-  padding: 8px;
+  padding: 12px;
+  width: min(100%, 940px);
+  margin: auto 0;
 }
 
 body[data-playing="true"] .canvas-frame {
-  width: min(100%, calc(100svh - 28px));
+  width: min(100%, 820px, calc(100svh - 96px));
+  max-width: 820px;
 }
 
 @keyframes hudPulse {
@@ -631,29 +724,27 @@ body[data-playing="true"] .canvas-frame {
   }
 }
 
-@media (min-width: 1221px) {
-  body[data-playing="true"] {
-    overflow: hidden;
-  }
-}
-
 @media (max-width: 1220px) {
   .app-shell {
     grid-template-columns: 1fr;
   }
 
   body[data-playing="true"] .app-shell {
-    height: auto;
+    min-height: auto;
+    padding-top: 0;
   }
 
   body[data-playing="true"] .arena-panel {
     order: -1;
+    min-height: auto;
+    padding-top: 12px;
   }
 
   body[data-playing="true"] .sidebar {
     overflow: visible;
     padding-right: 0;
   }
+
 }
 
 @media (max-width: 860px) {
@@ -688,6 +779,10 @@ body[data-playing="true"] .canvas-frame {
 
   .canvas-frame {
     width: 100%;
+  }
+
+  body[data-playing="true"] .canvas-frame {
+    width: min(100%, calc(100svh - 108px));
   }
 
   .overlay {

@@ -1,13 +1,9 @@
 export class MultiplayerClient extends EventTarget {
-  constructor({ getToken }) {
+  constructor() {
     super();
-    this.getToken = getToken;
     this.roomCode = null;
     this.socket = window.io({
-      autoConnect: false,
-      auth: (callback) => {
-        callback({ token: this.getToken?.() || "" });
-      }
+      autoConnect: false
     });
     this.bindSocketEvents();
     this.socket.connect();
@@ -32,7 +28,7 @@ export class MultiplayerClient extends EventTarget {
     this.socket.on("connect", () => this.emitEvent("connect"));
     this.socket.on("disconnect", () => this.emitEvent("disconnect"));
 
-    ["roomCreated", "roomJoined", "roomLeft", "roomState", "roomError", "leaderboardUpdated"].forEach((eventName) => {
+    ["roomCreated", "roomJoined", "roomLeft", "roomState", "roomError"].forEach((eventName) => {
       this.socket.on(eventName, (payload = {}) => {
         if (eventName === "roomCreated" || eventName === "roomJoined") {
           this.roomCode = payload.roomCode;
@@ -45,12 +41,12 @@ export class MultiplayerClient extends EventTarget {
     });
   }
 
-  createRoom() {
-    this.socket.emit("createRoom");
+  createRoom(playerProfile) {
+    this.socket.emit("createRoom", { playerProfile });
   }
 
-  joinRoom(code) {
-    this.socket.emit("joinRoom", { code });
+  joinRoom(code, playerProfile) {
+    this.socket.emit("joinRoom", { code, playerProfile });
   }
 
   leaveRoom() {
