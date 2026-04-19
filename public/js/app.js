@@ -20,6 +20,7 @@ const elements = {
   authColorPicker: document.getElementById("authColorPicker"),
   loginBtn: document.getElementById("loginBtn"),
   registerBtn: document.getElementById("registerBtn"),
+  guestBtn: document.getElementById("guestBtn"),
   authStatus: document.getElementById("authStatus"),
   savedProfilesBlock: document.getElementById("savedProfilesBlock"),
   savedProfilesList: document.getElementById("savedProfilesList"),
@@ -359,14 +360,14 @@ function renderSavedProfiles() {
 
 function syncPlayAvailability() {
   const enabled = Boolean(authState.user);
-  elements.soloBtn.disabled = !enabled;
-  elements.createRoomBtn.disabled = !enabled;
-  elements.joinRoomBtn.disabled = !enabled;
-  elements.roomCodeInput.disabled = !enabled;
-  elements.playStatusLabel.textContent = enabled ? "Ready" : "Locked";
+  elements.soloBtn.disabled = false;
+  elements.createRoomBtn.disabled = false;
+  elements.joinRoomBtn.disabled = false;
+  elements.roomCodeInput.disabled = false;
+  elements.playStatusLabel.textContent = enabled ? (authState.user.isGuest ? "Guest Ready" : "Ready") : "Quick Play";
 
   if (!enabled && activeMode === "menu") {
-    setStatus(elements.roomStatus, "Sign in on this device to unlock solo and multiplayer.");
+    setStatus(elements.roomStatus, "Start solo right away, or sign in to keep a named local profile.");
   }
 }
 
@@ -525,9 +526,11 @@ function applyAuthSuccess({ user }, message) {
   resetNetwork();
   renderAccountState();
   setStatus(elements.authStatus, message);
-  setStatus(elements.profileStatus, "Profile stored on this device.");
-  setStatus(elements.roomStatus, "Choose solo or create a room.");
-  updateHud(null, { modeLabel: "Ready", roomCode: "-" });
+  setStatus(elements.profileStatus, user.isGuest ? "Guest profile stored on this device." : "Profile stored on this device.");
+  setStatus(elements.roomStatus, user.isGuest
+    ? "Guest pilot ready. Start solo or create a room."
+    : "Choose solo or create a room.");
+  updateHud(null, { modeLabel: user.isGuest ? "Guest" : "Ready", roomCode: "-" });
   fetchLeaderboard();
 }
 
@@ -535,9 +538,11 @@ function loadSession() {
   authState.user = deviceStorage.getSessionUser();
   authState.profileColor = authState.user?.snakeColor ?? SNAKE_COLOR_OPTIONS[0];
   renderAccountState();
-  updateHud(null, { modeLabel: authState.user ? "Ready" : "Menu", roomCode: "-" });
+  updateHud(null, { modeLabel: authState.user ? (authState.user.isGuest ? "Guest" : "Ready") : "Menu", roomCode: "-" });
   if (authState.user) {
-    setStatus(elements.roomStatus, "Choose solo or create a room.");
+    setStatus(elements.roomStatus, authState.user.isGuest
+      ? "Guest pilot ready. Start solo or create a room."
+      : "Choose solo or create a room.");
   }
 }
 
@@ -593,6 +598,27 @@ async function loginAccount() {
   }
 }
 
+function buildGuestDisplayName() {
+  const suffix = String(Date.now()).slice(-4);
+  return `Guest ${suffix}`;
+}
+
+async function continueAsGuest() {
+  try {
+    const payload = deviceStorage.createGuestUser({
+      snakeColor: authState.registerColor,
+      displayName: buildGuestDisplayName()
+    });
+    applyAuthSuccess(payload, "Guest profile ready. You can play immediately on this device.");
+    elements.authPassword.value = "";
+    return true;
+  } catch (error) {
+    setStatus(elements.authStatus, error.message || "Guest quick play could not start.", true);
+    setStatus(elements.roomStatus, "Quick play could not start.", true);
+    return false;
+  }
+}
+
 function logoutAccount() {
   if (activeMode === "multiplayer") {
     saveCurrentMultiplayerProgress("Room progress saved on this device.");
@@ -605,7 +631,7 @@ function logoutAccount() {
   returnToMenu("Sign in on this device, choose your snake color, then launch a run.");
   renderAccountState();
   setStatus(elements.authStatus, "Signed out. Saved profiles remain on this device.");
-  setStatus(elements.roomStatus, "Sign in on this device to unlock solo and multiplayer.");
+  setStatus(elements.roomStatus, "Start solo right away, or sign in to keep a named local profile.");
   fetchLeaderboard();
 }
 
@@ -716,16 +742,6 @@ function attachSoloListeners(game) {
   });
 }
 
-function requireAccount(message) {
-  if (authState.user) {
-    return true;
-  }
-
-  setStatus(elements.authStatus, message, true);
-  setStatus(elements.roomStatus, "Sign in on this device first to start playing.", true);
-  return false;
-}
-
 function buildPlayerProfile() {
   if (!authState.user) {
     return null;
@@ -738,8 +754,16 @@ function buildPlayerProfile() {
   };
 }
 
+async function ensurePlayableUser() {
+  if (authState.user) {
+    return true;
+  }
+
+  return continueAsGuest();
+}
+
 function ensureNetwork() {
-  if (!requireAccount("Create a profile or sign in on this device first.")) {
+  if (!authState.user) {
     return null;
   }
 
@@ -762,8 +786,8 @@ function ensureNetwork() {
   }
 }
 
-function startSoloGame() {
-  if (!requireAccount("Sign in on this device to start a solo run.")) {
+async function startSoloGame() {
+  if (!await ensurePlayableUser()) {
     return;
   }
 
@@ -794,7 +818,11 @@ function startSoloGame() {
   renderer.triggerImpact({ intensity: 0.2, color: authState.user.snakeColor, duration: 220 });
 }
 
-function startCreateRoom() {
+async function startCreateRoom() {
+  if (!await ensurePlayableUser()) {
+    return;
+  }
+
   const client = ensureNetwork();
   if (!client) {
     return;
@@ -806,10 +834,14 @@ function startCreateRoom() {
   setStatus(elements.roomStatus, `Creating room with ${getRespawnModeLabel(authState.roomRespawnMode)}...`);
 }
 
-function startJoinRoom() {
+async function startJoinRoom() {
   const code = elements.roomCodeInput.value.trim().toUpperCase();
   if (!code) {
     setStatus(elements.roomStatus, "Enter a room code first.", true);
+    return;
+  }
+
+  if (!await ensurePlayableUser()) {
     return;
   }
 
@@ -1018,6 +1050,7 @@ elements.showLoginBtn.addEventListener("click", () => setAuthMode("login"));
 elements.showRegisterBtn.addEventListener("click", () => setAuthMode("register"));
 elements.loginBtn.addEventListener("click", loginAccount);
 elements.registerBtn.addEventListener("click", registerAccount);
+elements.guestBtn?.addEventListener("click", continueAsGuest);
 elements.logoutBtn.addEventListener("click", logoutAccount);
 elements.saveProfileBtn.addEventListener("click", saveProfile);
 elements.soloBtn.addEventListener("click", startSoloGame);

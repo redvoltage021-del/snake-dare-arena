@@ -104,6 +104,7 @@ function normalizeUser(user = {}) {
     displayName: sanitizeName(user.displayName || username || "Arena Pilot", "Arena Pilot"),
     snakeColor: normalizeColor(user.snakeColor),
     passwordHash: String(user.passwordHash || ""),
+    isGuest: Boolean(user.isGuest),
     createdAt: user.createdAt || new Date().toISOString(),
     updatedAt: user.updatedAt || new Date().toISOString(),
     stats: normalizeStats(user.stats)
@@ -135,6 +136,7 @@ function toPublicUser(user) {
     username: user.username,
     displayName: user.displayName,
     snakeColor: user.snakeColor,
+    isGuest: Boolean(user.isGuest),
     createdAt: user.createdAt,
     updatedAt: user.updatedAt,
     stats: {
@@ -217,6 +219,7 @@ export class DeviceStorage {
     const state = this.readState();
 
     return state.users
+      .filter((user) => !user.isGuest)
       .map((user) => ({
         id: user.id,
         username: user.username,
@@ -311,7 +314,17 @@ export class DeviceStorage {
       throw new Error("No saved profile with that username exists on this device.");
     }
 
-    const candidateHash = await hashPassword(usernameKey, password);
+    if (user.isGuest) {
+      state.currentUserId = user.id;
+      user.updatedAt = new Date().toISOString();
+      this.writeState(state);
+      return {
+        user: toPublicUser(user),
+        entries: this.getLeaderboard({ board: "solo" })
+      };
+    }
+
+    const candidateHash = await hashPassword(user.usernameKey, password);
     if (candidateHash !== user.passwordHash) {
       throw new Error("Incorrect password.");
     }
@@ -320,6 +333,49 @@ export class DeviceStorage {
     this.writeState(state);
     return {
       user: toPublicUser(user),
+      entries: this.getLeaderboard({ board: "solo" })
+    };
+  }
+
+  createGuestUser({ snakeColor, displayName } = {}) {
+    const state = this.readState();
+    const now = new Date().toISOString();
+    const existingGuest = [...state.users]
+      .filter((entry) => entry.isGuest)
+      .sort((left, right) => String(right.updatedAt).localeCompare(String(left.updatedAt)))[0];
+
+    if (existingGuest) {
+      existingGuest.snakeColor = normalizeColor(snakeColor || existingGuest.snakeColor);
+      existingGuest.displayName = sanitizeName(displayName || existingGuest.displayName || "Guest Pilot", "Guest Pilot");
+      existingGuest.updatedAt = now;
+      state.currentUserId = existingGuest.id;
+      this.writeState(state);
+      return {
+        user: toPublicUser(existingGuest),
+        entries: this.getLeaderboard({ board: "solo" })
+      };
+    }
+
+    const usernameKey = sanitizeUsername(`guest${Date.now().toString(36).slice(-5)}`) || `guest${state.users.length + 1}`;
+    const guestUser = normalizeUser({
+      id: createUserId(),
+      username: usernameKey,
+      usernameKey,
+      displayName: displayName || "Guest Pilot",
+      snakeColor,
+      passwordHash: "",
+      isGuest: true,
+      createdAt: now,
+      updatedAt: now,
+      stats: createDefaultStats()
+    });
+
+    state.users.push(guestUser);
+    state.currentUserId = guestUser.id;
+    this.writeState(state);
+
+    return {
+      user: toPublicUser(guestUser),
       entries: this.getLeaderboard({ board: "solo" })
     };
   }
