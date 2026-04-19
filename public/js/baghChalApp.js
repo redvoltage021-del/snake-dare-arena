@@ -173,11 +173,15 @@ class BaghChalApp {
     this.difficulty = elements.difficultySelect.value;
     this.humanSide = elements.humanSideSelect.value;
     this.aiPending = false;
+    this.aiRequestId = 0;
+    this.pendingAiJob = null;
     this.clock = 0;
     this.tasks = [];
+    this.frameHandle = null;
     this.pieceNodes = new Map();
     this.effectNodes = new Map();
     this.music = new FolkMusicController(elements.musicToggleBtn);
+    this.aiWorker = this.createAiWorker();
     this.lastFrameTime = performance.now();
 
     this.renderStaticBoard();
@@ -185,7 +189,6 @@ class BaghChalApp {
     this.applyModeState();
     this.render();
     this.scheduleAiTurnIfNeeded();
-    window.requestAnimationFrame((now) => this.frame(now));
   }
 
   bindEvents() {
@@ -206,6 +209,91 @@ class BaghChalApp {
 
     elements.newGameBtn.addEventListener("click", () => this.resetGame());
     elements.musicToggleBtn.addEventListener("click", () => this.music.toggle());
+    window.addEventListener("beforeunload", () => {
+      this.aiWorker?.terminate();
+    });
+  }
+
+  createAiWorker() {
+    if (typeof Worker !== "function") {
+      return null;
+    }
+
+    try {
+      const worker = new Worker("/js/baghChalAIWorker.js?v=20260419a", { type: "module" });
+      worker.addEventListener("message", (event) => this.handleAiResult(event.data));
+      worker.addEventListener("error", () => {
+        if (this.aiWorker !== worker) {
+          return;
+        }
+
+        worker.terminate();
+        this.aiWorker = null;
+        if (this.pendingAiJob) {
+          const { requestId, stateSnapshot } = this.pendingAiJob;
+          window.setTimeout(() => this.runAiFallback(requestId, stateSnapshot), 0);
+        }
+      });
+      return worker;
+    } catch {
+      return null;
+    }
+  }
+
+  resetAiWorker() {
+    this.aiWorker?.terminate();
+    this.aiWorker = this.createAiWorker();
+  }
+
+  cloneStateForAi(state) {
+    if (typeof structuredClone === "function") {
+      return structuredClone(state);
+    }
+
+    return JSON.parse(JSON.stringify(state));
+  }
+
+  handleAiResult(payload = {}) {
+    if (payload.requestId !== this.aiRequestId) {
+      return;
+    }
+
+    this.aiPending = false;
+    this.pendingAiJob = null;
+
+    if (!this.isAiTurn()) {
+      this.renderStatus();
+      return;
+    }
+
+    if (payload.error) {
+      this.renderStatus();
+      elements.statusLine.textContent = "AI hit a snag. Try the move again or start a new match.";
+      return;
+    }
+
+    if (payload.action) {
+      this.commitAction(payload.action);
+      return;
+    }
+
+    this.render();
+  }
+
+  runAiFallback(requestId, stateSnapshot) {
+    if (requestId !== this.aiRequestId || !this.isAiTurn()) {
+      return;
+    }
+
+    try {
+      const action = getAiMove(stateSnapshot, this.difficulty);
+      this.handleAiResult({ requestId, action });
+    } catch (error) {
+      this.handleAiResult({
+        requestId,
+        error: error.message || "AI move failed."
+      });
+    }
   }
 
   renderStaticBoard() {
@@ -235,18 +323,21 @@ class BaghChalApp {
     elements.difficultySelect.disabled = !isAiMode;
     elements.humanSideSelect.disabled = !isAiMode;
     elements.modeNote.textContent = modeNotes[this.mode];
-    this.aiPending = false;
-    this.cancelTask("ai-turn");
+    this.clearTransientState();
 
     this.render();
     this.scheduleAiTurnIfNeeded();
   }
 
   frame(now) {
+    this.frameHandle = null;
     const delta = now - this.lastFrameTime;
     this.lastFrameTime = now;
     this.advance(delta);
-    window.requestAnimationFrame((time) => this.frame(time));
+
+    if (this.tasks.length) {
+      this.ensureFrameLoop();
+    }
   }
 
   advance(milliseconds = 16) {
@@ -262,6 +353,10 @@ class BaghChalApp {
     if (tasksRan) {
       this.render();
     }
+
+    if (this.tasks.length) {
+      this.ensureFrameLoop();
+    }
   }
 
   schedule(delay, callback, key = null) {
@@ -275,16 +370,29 @@ class BaghChalApp {
       callback
     });
     this.tasks.sort((left, right) => left.dueAt - right.dueAt);
+    this.ensureFrameLoop();
   }
 
   cancelTask(key) {
     this.tasks = this.tasks.filter((task) => task.key !== key);
   }
 
+  ensureFrameLoop() {
+    if (this.frameHandle !== null || !this.tasks.length) {
+      return;
+    }
+
+    this.lastFrameTime = performance.now();
+    this.frameHandle = window.requestAnimationFrame((now) => this.frame(now));
+  }
+
   clearTransientState() {
     this.selectedPieceId = null;
     this.aiPending = false;
+    this.aiRequestId += 1;
+    this.pendingAiJob = null;
     this.cancelTask("ai-turn");
+    this.resetAiWorker();
   }
 
   resetGame() {
@@ -317,22 +425,29 @@ class BaghChalApp {
     }
 
     this.aiPending = true;
+    const requestId = ++this.aiRequestId;
+    const stateSnapshot = this.cloneStateForAi(this.state);
+    this.pendingAiJob = { requestId, stateSnapshot };
     this.renderStatus();
 
-    this.schedule(540, () => {
-      this.aiPending = false;
-
-      if (!this.isAiTurn()) {
+    this.schedule(180, () => {
+      if (requestId !== this.aiRequestId || !this.isAiTurn()) {
+        this.aiPending = false;
+        this.pendingAiJob = null;
         this.renderStatus();
         return;
       }
 
-      const action = getAiMove(this.state, this.difficulty);
-      if (action) {
-        this.commitAction(action);
-      } else {
-        this.render();
+      if (this.aiWorker) {
+        this.aiWorker.postMessage({
+          requestId,
+          state: stateSnapshot,
+          difficulty: this.difficulty
+        });
+        return;
       }
+
+      window.setTimeout(() => this.runAiFallback(requestId, stateSnapshot), 0);
     }, "ai-turn");
   }
 

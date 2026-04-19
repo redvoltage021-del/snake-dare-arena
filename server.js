@@ -61,9 +61,14 @@ app.get("/bagh-chal", (_req, res) => {
   res.sendFile(path.join(__dirname, "public", "bagh-chal.html"));
 });
 
-app.get("/snake", (_req, res) => {
+app.get("/portal", (_req, res) => {
   res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate");
   res.sendFile(path.join(__dirname, "public", "index.html"));
+});
+
+app.get("/snake", (_req, res) => {
+  res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate");
+  res.sendFile(path.join(__dirname, "public", "snake.html"));
 });
 
 app.post("/api/legacy-auth/login", (req, res) => {

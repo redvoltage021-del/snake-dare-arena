@@ -3,211 +3,77 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Snake Dare Arena</title>
-    <link rel="stylesheet" href="/styles.css?v=20260419a" />
+    <title>Snake Lodu Arcade | Game Portal</title>
+    <link rel="stylesheet" href="/portal.css?v=20260419a" />
   </head>
-  <body data-mode="menu" data-overlay="visible">
-    <main class="app-shell">
-      <section class="sidebar">
-        <div class="card account-card">
-          <div class="card-header">
-            <span id="accountKicker">This Device</span>
-            <strong id="accountTitle">Sign In</strong>
-          </div>
-
-          <div id="authPanel">
-            <div class="auth-switch">
-              <button id="showLoginBtn" class="switch-btn is-active" type="button">Sign In</button>
-              <button id="showRegisterBtn" class="switch-btn" type="button">Create Profile</button>
-            </div>
-
-            <label class="field">
-              <span>Username</span>
-              <input id="authUsername" type="text" maxlength="18" placeholder="arenapilot" />
-            </label>
-
-            <label class="field">
-              <span>Password</span>
-              <input id="authPassword" type="password" maxlength="48" placeholder="Enter password" />
-            </label>
-
-            <div id="registerFields" hidden>
-              <label class="field">
-                <span>Display Name</span>
-                <input id="registerDisplayName" type="text" maxlength="18" placeholder="Arena Pilot" />
-              </label>
-
-              <div class="field">
-                <span>Snake Color</span>
-                <div id="authColorPicker" class="color-picker"></div>
-              </div>
-            </div>
-
-            <div class="auth-actions">
-              <button id="loginBtn" class="accent" type="button">Sign In</button>
-              <button id="registerBtn" class="accent" type="button" hidden>Create Profile</button>
-            </div>
-
-            <p id="authStatus" class="inline-status">
-              Create or sign into a profile saved on this device. You can use the username or tap a saved profile below.
-            </p>
-
-            <div id="savedProfilesBlock" class="saved-profiles" hidden>
-              <div class="detail-block compact">
-                <span>Saved On This Device</span>
-                <div id="savedProfilesList" class="saved-profiles-list"></div>
-              </div>
-            </div>
-          </div>
-
-          <div id="profilePanel" hidden>
-            <div class="identity-row">
-              <span id="profileColorBadge" class="identity-badge"></span>
-              <div class="identity-copy">
-                <strong id="profileDisplayName">Pilot</strong>
-                <span id="profileUsername">@pilot</span>
-              </div>
-            </div>
-
-            <div class="profile-stats">
-              <div class="stat-box">
-                <span>Solo Best</span>
-                <strong id="soloBestStat">0</strong>
-              </div>
-              <div class="stat-box">
-                <span>Total Runs</span>
-                <strong id="totalRunsStat">0</strong>
-              </div>
-              <div class="stat-box">
-                <span>Total Score</span>
-                <strong id="totalScoreStat">0</strong>
-              </div>
-              <div class="stat-box">
-                <span>Room Wins</span>
-                <strong id="multiplayerWinsStat">0</strong>
-              </div>
-            </div>
-
-            <label class="field">
-              <span>Display Name</span>
-              <input id="profileDisplayNameInput" type="text" maxlength="18" placeholder="Arena Pilot" />
-            </label>
-
-            <div class="field">
-              <span>Snake Color</span>
-              <div id="profileColorPicker" class="color-picker"></div>
-            </div>
-
-            <div class="auth-actions">
-              <button id="saveProfileBtn" class="accent" type="button">Save Profile</button>
-              <button id="logoutBtn" type="button">Log Out</button>
-            </div>
-
-            <p id="profileStatus" class="inline-status">Profile stored on this device.</p>
-          </div>
-        </div>
-
-        <div class="card play-card">
-          <div class="card-header">
-            <span>Play</span>
-            <strong id="playStatusLabel">Locked</strong>
-          </div>
-
-          <div class="menu-actions">
-            <button id="soloBtn" class="accent" type="button">Start Solo</button>
-            <button id="createRoomBtn" type="button">Create Room</button>
-          </div>
-
-          <div class="detail-block compact room-option-block">
-            <span>Room Respawn</span>
-            <div id="respawnModePicker" class="option-picker"></div>
-          </div>
-
-          <div class="join-row">
-            <input id="roomCodeInput" type="text" maxlength="6" placeholder="ROOM CODE" />
-            <button id="joinRoomBtn" class="ghost" type="button">Join Room</button>
-          </div>
-
-          <p id="roomStatus" class="inline-status">
-            Sign in on this device to unlock solo and multiplayer.
+  <body>
+    <main class="portal-shell">
+      <section class="portal-hero">
+        <div class="hero-copy">
+          <p class="eyebrow">Snake Lodu Arcade</p>
+          <h1>Choose your arena, then step into a full game space built for it.</h1>
+          <p class="hero-text">
+            Jump into fast neon survival with Snake Dare Arena or settle into the carved-board strategy of Bagh-Chal.
+            Both games now live in their own dedicated pages, with this portal as the switchboard between them.
           </p>
-
-          <a class="game-link" href="/bagh-chal">Open Bagh-Chal</a>
         </div>
 
-        <div class="card hud-card">
-          <div class="card-header">
-            <span>Run Data</span>
-            <strong id="modeValue">Menu</strong>
+        <div class="hero-support">
+          <p>One portal. Two very different moods.</p>
+          <div class="hero-actions">
+            <a class="hero-link primary" href="/snake">Open Snake</a>
+            <a class="hero-link secondary" href="/bagh-chal">Open Bagh-Chal</a>
           </div>
-
-          <div class="hud-grid">
-            <div class="stat-box large">
-              <span>Score</span>
-              <strong id="scoreValue">0</strong>
-            </div>
-            <div class="stat-box">
-              <span>Room</span>
-              <strong id="roomCodeValue">-</strong>
-            </div>
-          </div>
-
-          <div class="detail-block">
-            <span>Target</span>
-            <strong id="targetValue">Sign in on this device and launch a run.</strong>
-          </div>
-
-          <div class="detail-block">
-            <span>Active Dare</span>
-            <strong id="dareValue">Your current challenge will appear here.</strong>
-          </div>
-
-          <div class="detail-block">
-            <span>Effects</span>
-            <div id="effectsList" class="effects-list">
-              <span class="empty-pill">No live effects</span>
-            </div>
-          </div>
-
-          <div class="detail-block">
-            <span>Feed</span>
-            <div id="statusFeed" class="feed">
-              <p>Pick a mode to start moving.</p>
-            </div>
-          </div>
-
-          <div class="mission-actions">
-            <button id="leaveRoomBtn" class="ghost small" type="button" hidden>Leave Room</button>
-            <button id="reviveBtn" class="ghost small" type="button" hidden>Revive Now</button>
-            <button id="restartBtn" class="accent small" type="button" hidden>Restart Solo</button>
-          </div>
-        </div>
-
-        <div class="card leaderboard-card">
-          <div class="card-header">
-            <span>This Device Leaderboard</span>
-            <button id="refreshLeaderboardBtn" class="ghost small" type="button">Reload</button>
-          </div>
-          <ol id="leaderboardList" class="leaderboard-list"></ol>
         </div>
       </section>
 
-      <section class="arena-panel">
-        <div class="canvas-wrap card">
-          <div class="canvas-frame">
-            <canvas id="gameCanvas" width="616" height="616" tabindex="0"></canvas>
-            <div class="canvas-glass"></div>
-            <div id="overlay" class="overlay">
-              <div class="overlay-kicker">Arena</div>
-              <h2 id="overlayTitle">Snake Dare Arena</h2>
-              <p id="overlayMessage">Sign in on this device, choose your snake color, then launch a run.</p>
-            </div>
+      <section class="game-split" aria-label="Game choices">
+        <article class="game-lane snake-lane">
+          <div class="lane-copy">
+            <p class="lane-kicker">Arcade Survival</p>
+            <h2>Snake Dare Arena</h2>
+            <p class="lane-text">
+              Solo runs, live room battles, dares, power-ups, and device-saved progress in one sharp neon arena.
+            </p>
           </div>
-        </div>
+
+          <ul class="lane-points">
+            <li>Solo mode with dares and power-ups</li>
+            <li>Room codes for live multiplayer battles</li>
+            <li>Auto respawn or Revive Now room options</li>
+          </ul>
+
+          <div class="lane-footer">
+            <span class="lane-tag">Fast</span>
+            <a class="lane-link" href="/snake">Enter Snake</a>
+          </div>
+        </article>
+
+        <article class="game-lane baghchal-lane">
+          <div class="lane-copy">
+            <p class="lane-kicker">Traditional Nepali Strategy</p>
+            <h2>Bagh-Chal</h2>
+            <p class="lane-text">
+              Play the classic 4 tigers versus 20 goats board game locally or against AI in its own focused strategy room.
+            </p>
+          </div>
+
+          <ul class="lane-points">
+            <li>Local versus mode and AI mode</li>
+            <li>Easy, medium, and hard AI</li>
+            <li>Traditional board with move highlights and match log</li>
+          </ul>
+
+          <div class="lane-footer">
+            <span class="lane-tag">Tactical</span>
+            <a class="lane-link" href="/bagh-chal">Enter Bagh-Chal</a>
+          </div>
+        </article>
+      </section>
+
+      <section class="portal-note">
+        <p>Use this page anytime you want to switch between the two games without mixing their layouts together.</p>
       </section>
     </main>
-
-    <script src="/socket.io/socket.io.js"></script>
-    <script type="module" src="/js/app.js?v=20260419a"></script>
   </body>
 </html>

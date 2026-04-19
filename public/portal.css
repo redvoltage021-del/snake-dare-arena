@@ -1,0 +1,349 @@
+:root {
+  --bg: #09181d;
+  --panel: #10262d;
+  --panel-alt: #171f28;
+  --line: rgba(237, 250, 251, 0.12);
+  --line-strong: rgba(237, 250, 251, 0.24);
+  --text: #f4fbfc;
+  --muted: #a2c0c8;
+  --snake-accent: #19e2c0;
+  --snake-hot: #ffd33d;
+  --bagh-accent: #d78132;
+  --bagh-deep: #7b3217;
+  --shadow: 0 22px 44px rgba(0, 0, 0, 0.28);
+  --headline-font: "Rockwell", "Georgia", serif;
+  --ui-font: "Bahnschrift", "Trebuchet MS", sans-serif;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html {
+  color-scheme: dark;
+}
+
+body {
+  margin: 0;
+  min-height: 100svh;
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--ui-font);
+}
+
+body::before,
+body::after {
+  content: "";
+  position: fixed;
+  inset: auto;
+  pointer-events: none;
+  z-index: 0;
+  border-radius: 32px;
+}
+
+body::before {
+  top: 28px;
+  right: 28px;
+  width: 220px;
+  height: 220px;
+  background: rgba(25, 226, 192, 0.08);
+  filter: blur(26px);
+}
+
+body::after {
+  left: 32px;
+  bottom: 28px;
+  width: 220px;
+  height: 220px;
+  background: rgba(215, 129, 50, 0.1);
+  filter: blur(30px);
+}
+
+.portal-shell {
+  position: relative;
+  z-index: 1;
+  width: min(1320px, calc(100% - 32px));
+  margin: 0 auto;
+  padding: 24px 0 32px;
+}
+
+.portal-hero {
+  display: grid;
+  grid-template-columns: minmax(0, 1.4fr) minmax(280px, 0.8fr);
+  gap: 22px;
+  min-height: min(56svh, 560px);
+  padding: 34px;
+  border: 1px solid var(--line);
+  background: #0e2229;
+  box-shadow: var(--shadow);
+  animation: portalLift 0.7s ease;
+}
+
+.hero-copy,
+.hero-support,
+.game-lane,
+.portal-note {
+  border: 1px solid var(--line);
+}
+
+.hero-copy {
+  display: grid;
+  align-content: end;
+  gap: 16px;
+  padding: 30px;
+  background: #0b1b20;
+}
+
+.eyebrow,
+.lane-kicker {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.74rem;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+}
+
+.hero-copy h1,
+.lane-copy h2 {
+  margin: 0;
+  font-family: var(--headline-font);
+  line-height: 0.96;
+}
+
+.hero-copy h1 {
+  max-width: 11ch;
+  font-size: clamp(2.8rem, 5vw, 5.4rem);
+}
+
+.hero-text,
+.hero-support p,
+.lane-text,
+.portal-note p {
+  margin: 0;
+  color: var(--muted);
+  line-height: 1.65;
+  font-size: 1rem;
+}
+
+.hero-text {
+  max-width: 44ch;
+}
+
+.hero-support {
+  display: grid;
+  align-content: space-between;
+  gap: 24px;
+  padding: 28px;
+  background: #12151e;
+}
+
+.hero-support p {
+  max-width: 18ch;
+  font-size: 1.2rem;
+  color: var(--text);
+}
+
+.hero-actions {
+  display: grid;
+  gap: 12px;
+}
+
+.hero-link,
+.lane-link {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 52px;
+  padding: 12px 18px;
+  color: inherit;
+  text-decoration: none;
+  font-weight: 700;
+  transition: transform 0.18s ease, box-shadow 0.18s ease, filter 0.18s ease;
+}
+
+.hero-link:hover,
+.lane-link:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 12px 24px rgba(0, 0, 0, 0.22);
+  filter: brightness(1.04);
+}
+
+.hero-link.primary {
+  background: var(--snake-hot);
+  color: #2b1d00;
+}
+
+.hero-link.secondary {
+  background: #d3b187;
+  color: #2f190d;
+}
+
+.game-split {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 22px;
+  margin-top: 22px;
+}
+
+.game-lane {
+  display: grid;
+  grid-template-rows: auto 1fr auto;
+  gap: 26px;
+  min-height: 420px;
+  padding: 30px;
+  box-shadow: var(--shadow);
+  transform: translateY(0);
+  transition: transform 0.2s ease, border-color 0.2s ease;
+}
+
+.game-lane:hover {
+  transform: translateY(-4px);
+  border-color: var(--line-strong);
+}
+
+.snake-lane {
+  background: #0d2028;
+}
+
+.baghchal-lane {
+  background: #211911;
+}
+
+.lane-copy {
+  display: grid;
+  gap: 14px;
+}
+
+.lane-copy h2 {
+  font-size: clamp(2.2rem, 3.8vw, 3.6rem);
+}
+
+.snake-lane .lane-copy h2,
+.snake-lane .lane-link,
+.snake-lane .lane-tag {
+  color: var(--snake-accent);
+}
+
+.baghchal-lane .lane-copy h2,
+.baghchal-lane .lane-link,
+.baghchal-lane .lane-tag {
+  color: #f0bb7c;
+}
+
+.lane-points {
+  display: grid;
+  gap: 12px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.lane-points li {
+  position: relative;
+  padding-left: 18px;
+  color: #d6ebee;
+  line-height: 1.45;
+}
+
+.lane-points li::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 0.63em;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+}
+
+.snake-lane .lane-points li::before {
+  background: var(--snake-accent);
+}
+
+.baghchal-lane .lane-points li::before {
+  background: var(--bagh-accent);
+}
+
+.lane-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.lane-tag {
+  font-size: 0.84rem;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+}
+
+.lane-link {
+  border: 1px solid currentColor;
+}
+
+.portal-note {
+  margin-top: 22px;
+  padding: 20px 26px;
+  background: #0d1b20;
+  animation: portalFade 0.8s ease 0.08s both;
+}
+
+@keyframes portalLift {
+  from {
+    opacity: 0;
+    transform: translateY(18px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes portalFade {
+  from {
+    opacity: 0;
+  }
+
+  to {
+    opacity: 1;
+  }
+}
+
+@media (max-width: 980px) {
+  .portal-hero,
+  .game-split {
+    grid-template-columns: 1fr;
+  }
+
+  .hero-copy h1 {
+    max-width: 13ch;
+  }
+}
+
+@media (max-width: 720px) {
+  .portal-shell {
+    width: min(100% - 18px, 1320px);
+    padding-top: 16px;
+  }
+
+  .portal-hero,
+  .game-lane,
+  .portal-note {
+    padding: 22px;
+  }
+
+  .hero-copy h1,
+  .lane-copy h2 {
+    font-size: clamp(2.1rem, 10vw, 3.2rem);
+  }
+
+  .lane-footer {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .lane-link,
+  .hero-link {
+    width: 100%;
+  }
+}
