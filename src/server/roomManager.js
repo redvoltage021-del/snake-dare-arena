@@ -9,12 +9,13 @@ export class RoomManager {
     this.socketRooms = new Map();
   }
 
-  createRoom(socket, playerProfile) {
+  createRoom(socket, playerProfile, roomOptions = {}) {
     this.detachSocket(socket);
 
     const code = createRoomCode(new Set(this.rooms.keys()));
     const room = new MultiplayerRoom({
       code,
+      roomOptions,
       io: this.io,
       leaderboardManager: this.leaderboardManager,
       onEmpty: () => {
@@ -66,6 +67,12 @@ export class RoomManager {
     const roomCode = this.socketRooms.get(socketId);
     const room = roomCode ? this.rooms.get(roomCode) : null;
     room?.setDirection(socketId, directionName);
+  }
+
+  requestRespawn(socketId) {
+    const roomCode = this.socketRooms.get(socketId);
+    const room = roomCode ? this.rooms.get(roomCode) : null;
+    room?.requestRespawn(socketId);
   }
 
   detachSocket(socket) {

@@ -1,0 +1,182 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Bagh-Chal | Snake Lodu Arcade</title>
+    <link rel="stylesheet" href="/bagh-chal.css?v=20260412a" />
+  </head>
+  <body>
+    <main class="baghchal-page">
+      <header class="page-header">
+        <div class="page-copy">
+          <a class="back-link" href="/">Back to Snake Lodu</a>
+          <p class="eyebrow">Traditional Nepali Strategy</p>
+          <h1>Bagh-Chal <span>बाघ-चाल</span></h1>
+          <p class="subtitle">
+            Four tigers. Twenty goats. One carved board. Place, trap, leap, and outthink the other side.
+          </p>
+        </div>
+
+        <div class="header-actions">
+          <button id="musicToggleBtn" class="utility-btn" type="button" aria-pressed="false">Music Off</button>
+          <button id="newGameBtn" class="utility-btn primary" type="button">New Match</button>
+        </div>
+      </header>
+
+      <section class="hero-band">
+        <div class="hero-copy">
+          <p>Goats win by freezing all four tigers. Tigers win by capturing five goats.</p>
+        </div>
+      </section>
+
+      <section class="game-layout">
+        <aside class="panel setup-panel">
+          <div class="panel-head">
+            <span>Mode Setup</span>
+            <strong>Choose the side of the story</strong>
+          </div>
+
+          <label class="field">
+            <span>Mode</span>
+            <select id="modeSelect">
+              <option value="local">Player vs Player</option>
+              <option value="ai">Player vs AI</option>
+            </select>
+          </label>
+
+          <label class="field">
+            <span>AI Difficulty</span>
+            <select id="difficultySelect">
+              <option value="easy">Easy · random</option>
+              <option value="medium" selected>Medium · tactical</option>
+              <option value="hard">Hard · minimax</option>
+            </select>
+          </label>
+
+          <label class="field">
+            <span>Human Side</span>
+            <select id="humanSideSelect">
+              <option value="goat">Play as Goats</option>
+              <option value="tiger">Play as Tigers</option>
+            </select>
+          </label>
+
+          <div class="mode-note" id="modeNote">
+            Local mode keeps both sides on this board. Switch to AI when you want solo practice.
+          </div>
+
+          <div class="rules-strip">
+            <div>
+              <span>Goat Phase</span>
+              <strong>Place all 20 before moving</strong>
+            </div>
+            <div>
+              <span>Tiger Power</span>
+              <strong>Leap over goats to capture</strong>
+            </div>
+          </div>
+
+          <div class="rules-list">
+            <article>
+              <span>Goats</span>
+              <p>Place one goat each turn, then move one step along connected lines after all 20 are on the board.</p>
+            </article>
+            <article>
+              <span>Tigers</span>
+              <p>Move one step or jump over one adjacent goat into an empty point beyond it to capture.</p>
+            </article>
+            <article>
+              <span>Victory</span>
+              <p>Goats win by trapping every tiger. Tigers win after capturing five goats.</p>
+            </article>
+          </div>
+        </aside>
+
+        <section class="board-stage">
+          <div class="board-head">
+            <div class="board-state">
+              <span id="turnBadge" class="turn-badge goat-turn">Goats Turn</span>
+              <strong id="phaseLabel">Placement Phase</strong>
+            </div>
+            <div class="board-meta">
+              <span id="aiStatus">Local duel on this device</span>
+            </div>
+          </div>
+
+          <div class="board-frame">
+            <div id="winnerBanner" class="winner-banner hidden" aria-live="polite">
+              <strong id="winnerTitle">Goats Win</strong>
+              <p id="winnerText">Every tiger is trapped.</p>
+            </div>
+
+            <div id="baghChalBoard" class="board" aria-label="Bagh-Chal board">
+              <svg id="boardLines" class="board-lines" viewBox="0 0 100 100" aria-hidden="true"></svg>
+              <div id="boardPoints" class="board-points" aria-hidden="true"></div>
+              <div id="moveLayer" class="move-layer"></div>
+              <div id="pieceLayer" class="piece-layer"></div>
+              <div class="board-grain" aria-hidden="true"></div>
+            </div>
+          </div>
+
+          <div class="board-footer">
+            <p id="statusLine" class="status-line">
+              Goats place first. Drop a goat onto any open point.
+            </p>
+            <div class="legend">
+              <span><i class="legend-mark goat-mark"></i> Goat</span>
+              <span><i class="legend-mark tiger-mark"></i> Tiger</span>
+              <span><i class="legend-mark move-mark"></i> Possible move</span>
+            </div>
+          </div>
+        </section>
+
+        <aside class="panel info-panel">
+          <div class="panel-head">
+            <span>Match State</span>
+            <strong>Read the board quickly</strong>
+          </div>
+
+          <div class="stats-grid">
+            <article>
+              <span>Goats Placed</span>
+              <strong id="goatsPlacedValue">0 / 20</strong>
+            </article>
+            <article>
+              <span>Goats Captured</span>
+              <strong id="goatsCapturedValue">0 / 5</strong>
+            </article>
+            <article>
+              <span>Goats to Place</span>
+              <strong id="goatsReserveValue">20</strong>
+            </article>
+            <article>
+              <span>Tigers Trapped</span>
+              <strong id="trappedValue">0 / 4</strong>
+            </article>
+          </div>
+
+          <div class="goal-card">
+            <span>Current Goal</span>
+            <strong id="goalLabel">Place goats to close the board and limit tiger space.</strong>
+          </div>
+
+          <div class="selection-card">
+            <span>Selection</span>
+            <strong id="selectionLabel">No piece selected.</strong>
+          </div>
+
+          <div class="log-card">
+            <div class="section-head">
+              <span>Move Log</span>
+              <strong>Latest turns</strong>
+            </div>
+            <ol id="moveLog" class="move-log"></ol>
+          </div>
+        </aside>
+      </section>
+    </main>
+
+    <script type="module" src="/js/baghChalApp.js?v=20260412a"></script>
+  </body>
+</html>

@@ -1,4 +1,4 @@
-import { KEY_TO_DIRECTION, SNAKE_COLOR_OPTIONS } from "/shared/config.js";
+import { DEFAULT_ROOM_RESPAWN_MODE, KEY_TO_DIRECTION, ROOM_RESPAWN_MODES, SNAKE_COLOR_OPTIONS } from "/shared/config.js";
 import { formatTimeLeft } from "/shared/utils.js";
 import { DeviceStorage } from "./deviceStorage.js";
 import { MultiplayerClient } from "./network.js";
@@ -38,11 +38,13 @@ const elements = {
   playStatusLabel: document.getElementById("playStatusLabel"),
   soloBtn: document.getElementById("soloBtn"),
   createRoomBtn: document.getElementById("createRoomBtn"),
+  respawnModePicker: document.getElementById("respawnModePicker"),
   roomCodeInput: document.getElementById("roomCodeInput"),
   joinRoomBtn: document.getElementById("joinRoomBtn"),
   roomStatus: document.getElementById("roomStatus"),
   refreshLeaderboardBtn: document.getElementById("refreshLeaderboardBtn"),
   leaveRoomBtn: document.getElementById("leaveRoomBtn"),
+  reviveBtn: document.getElementById("reviveBtn"),
   restartBtn: document.getElementById("restartBtn"),
   modeValue: document.getElementById("modeValue"),
   scoreValue: document.getElementById("scoreValue"),
@@ -68,7 +70,8 @@ const authState = {
   user: null,
   mode: "login",
   registerColor: SNAKE_COLOR_OPTIONS[0],
-  profileColor: SNAKE_COLOR_OPTIONS[0]
+  profileColor: SNAKE_COLOR_OPTIONS[0],
+  roomRespawnMode: DEFAULT_ROOM_RESPAWN_MODE
 };
 
 let activeMode = "menu";
@@ -284,6 +287,39 @@ function renderColorPicker(container, selectedColor, onSelect) {
   });
 }
 
+function getRespawnModeLabel(mode) {
+  return ROOM_RESPAWN_MODES[mode]?.label ?? ROOM_RESPAWN_MODES[DEFAULT_ROOM_RESPAWN_MODE].label;
+}
+
+function renderRespawnModePicker() {
+  if (!elements.respawnModePicker) {
+    return;
+  }
+
+  elements.respawnModePicker.innerHTML = Object.values(ROOM_RESPAWN_MODES)
+    .filter((mode) => mode.id !== "none")
+    .map(
+      (mode) => `
+        <button
+          type="button"
+          class="option-pill ${authState.roomRespawnMode === mode.id ? "is-selected" : ""}"
+          data-mode="${mode.id}"
+        >
+          <strong>${mode.label}</strong>
+          <span>${mode.description}</span>
+        </button>
+      `
+    )
+    .join("");
+
+  elements.respawnModePicker.querySelectorAll(".option-pill").forEach((button) => {
+    button.addEventListener("click", () => {
+      authState.roomRespawnMode = button.dataset.mode || DEFAULT_ROOM_RESPAWN_MODE;
+      renderRespawnModePicker();
+    });
+  });
+}
+
 function renderSavedProfiles() {
   const profiles = deviceStorage.getSavedProfiles();
   elements.savedProfilesBlock.hidden = profiles.length === 0;
@@ -379,6 +415,7 @@ function renderAccountState() {
     elements.multiplayerWinsStat.textContent = String(authState.user.stats.multiplayerWins ?? 0);
   }
 
+  renderRespawnModePicker();
   syncPlayAvailability();
 }
 
@@ -557,6 +594,10 @@ async function loginAccount() {
 }
 
 function logoutAccount() {
+  if (activeMode === "multiplayer") {
+    saveCurrentMultiplayerProgress("Room progress saved on this device.");
+  }
+
   deviceStorage.logout();
   authState.user = null;
   authState.profileColor = SNAKE_COLOR_OPTIONS[0];
@@ -643,6 +684,18 @@ function finalizeTrackedMultiplayerRun({ score, won, message }) {
   }
 }
 
+function saveCurrentMultiplayerProgress(message = "Room result saved on this device.") {
+  if (!multiplayerRun || !multiplayerRun.seenState || multiplayerRun.finalized) {
+    return;
+  }
+
+  finalizeTrackedMultiplayerRun({
+    score: multiplayerState?.local?.score ?? multiplayerRun.lastScore ?? 0,
+    won: false,
+    message
+  });
+}
+
 function clearTrackedMultiplayerRun() {
   multiplayerRun = null;
 }
@@ -715,6 +768,9 @@ function startSoloGame() {
   }
 
   if (network?.roomCode) {
+    if (activeMode === "multiplayer") {
+      saveCurrentMultiplayerProgress("Room progress saved on this device.");
+    }
     suppressNextRoomLeft = true;
     network.leaveRoom();
   }
@@ -731,6 +787,7 @@ function startSoloGame() {
   lastMultiplayerScore = 0;
   elements.restartBtn.hidden = false;
   elements.leaveRoomBtn.hidden = true;
+  elements.reviveBtn.hidden = true;
   setStatus(elements.roomStatus, "Launch sequence armed. Queue your first move.");
   setOverlay(false, "", "");
   triggerArenaZoom();
@@ -743,8 +800,10 @@ function startCreateRoom() {
     return;
   }
 
-  client.createRoom(buildPlayerProfile());
-  setStatus(elements.roomStatus, "Creating room...");
+  client.createRoom(buildPlayerProfile(), {
+    respawnMode: authState.roomRespawnMode
+  });
+  setStatus(elements.roomStatus, `Creating room with ${getRespawnModeLabel(authState.roomRespawnMode)}...`);
 }
 
 function startJoinRoom() {
@@ -771,35 +830,38 @@ function returnToMenu(message) {
   clearTrackedMultiplayerRun();
   elements.restartBtn.hidden = true;
   elements.leaveRoomBtn.hidden = true;
+  elements.reviveBtn.hidden = true;
   updateHud(null, { modeLabel: authState.user ? "Ready" : "Menu", roomCode: "-" });
   setOverlay(true, "Snake Dare Arena", message);
 }
 
 function bindNetworkEvents(client) {
-  client.on("roomCreated", ({ roomCode }) => {
+  client.on("roomCreated", ({ roomCode, respawnMode }) => {
     setActiveMode("multiplayer");
     enterPlayingView();
     elements.restartBtn.hidden = true;
     elements.leaveRoomBtn.hidden = false;
+    elements.reviveBtn.hidden = true;
     soloGame = null;
     lastMultiplayerScore = 0;
     elements.roomCodeInput.value = roomCode;
     startTrackedMultiplayerRun(roomCode);
-    setStatus(elements.roomStatus, `Room ${roomCode} created. Share the code.`);
+    setStatus(elements.roomStatus, `Room ${roomCode} created. ${getRespawnModeLabel(respawnMode)} is active.`);
     setOverlay(false, "", "");
     triggerArenaZoom();
   });
 
-  client.on("roomJoined", ({ roomCode }) => {
+  client.on("roomJoined", ({ roomCode, respawnMode }) => {
     setActiveMode("multiplayer");
     enterPlayingView();
     elements.restartBtn.hidden = true;
     elements.leaveRoomBtn.hidden = false;
+    elements.reviveBtn.hidden = true;
     soloGame = null;
     lastMultiplayerScore = 0;
     elements.roomCodeInput.value = roomCode;
     startTrackedMultiplayerRun(roomCode);
-    setStatus(elements.roomStatus, `Joined room ${roomCode}.`);
+    setStatus(elements.roomStatus, `Joined room ${roomCode}. ${getRespawnModeLabel(respawnMode)} is active.`);
     setOverlay(false, "", "");
     triggerArenaZoom();
   });
@@ -810,6 +872,7 @@ function bindNetworkEvents(client) {
       return;
     }
 
+    saveCurrentMultiplayerProgress("Room progress saved on this device.");
     returnToMenu(authState.user ? "Choose solo or join another room." : "Sign in to play.");
     setStatus(elements.roomStatus, authState.user ? "Choose solo or create a room." : "Sign in on this device to unlock solo and multiplayer.");
   });
@@ -823,6 +886,9 @@ function bindNetworkEvents(client) {
       return;
     }
 
+    const previousRoomState = multiplayerState;
+    const wasAlive = previousRoomState?.local?.alive ?? true;
+    const wasWinner = previousRoomState?.winnerId === previousRoomState?.localPlayerId;
     multiplayerState = state;
     setActiveMode("multiplayer");
     enterPlayingView();
@@ -839,18 +905,31 @@ function bindNetworkEvents(client) {
       renderer.triggerImpact({ intensity: 0.14, color: localPlayer.color, duration: 140 });
     }
     lastMultiplayerScore = state.local.score;
+    elements.reviveBtn.hidden = !state.local.canReviveNow;
 
     if (!state.local.alive) {
-      setOverlay(true, "Eliminated", `${state.local.statusText} Score: ${state.local.score}.`);
-      renderer.triggerImpact({ intensity: 0.64, color: "#ff5f76", duration: 320 });
-      finalizeTrackedMultiplayerRun({
-        score: state.local.score,
-        won: false,
-        message: "Room result saved on this device."
-      });
+      const isRespawnRoom = state.respawnMode === "auto" || state.respawnMode === "manual";
+      setOverlay(
+        true,
+        state.respawnMode === "auto" ? "Rebooting" : state.respawnMode === "manual" ? "Revive Ready" : "Eliminated",
+        `${state.local.statusText} Score: ${state.local.score}.`
+      );
+      if (wasAlive) {
+        renderer.triggerImpact({ intensity: 0.64, color: "#ff5f76", duration: 320 });
+      }
+
+      if (!isRespawnRoom) {
+        finalizeTrackedMultiplayerRun({
+          score: state.local.score,
+          won: false,
+          message: "Room result saved on this device."
+        });
+      }
     } else if (state.winnerId === state.localPlayerId && state.players.length > 1 && state.aliveCount === 1) {
       setOverlay(true, "Arena Won", `You cleared room ${state.roomCode} with ${state.local.score} points.`);
-      renderer.triggerImpact({ intensity: 0.38, color: "#94f056", duration: 260 });
+      if (!wasWinner) {
+        renderer.triggerImpact({ intensity: 0.38, color: "#94f056", duration: 260 });
+      }
       finalizeTrackedMultiplayerRun({
         score: state.local.score,
         won: true,
@@ -863,6 +942,7 @@ function bindNetworkEvents(client) {
 
   client.on("disconnect", () => {
     if (activeMode === "multiplayer") {
+      elements.reviveBtn.hidden = true;
       setOverlay(true, "Disconnected", "Connection lost. Reconnect by refreshing the page.");
       setStatus(elements.roomStatus, "Connection lost.", true);
     }
@@ -917,6 +997,7 @@ function describeCurrentState() {
     payload.local = snapshot.local;
   } else if (activeMode === "multiplayer" && multiplayerState) {
     payload.food = multiplayerState.food;
+    payload.respawnMode = multiplayerState.respawnMode;
     payload.powerUp = multiplayerState.powerUp;
     payload.local = multiplayerState.local;
     payload.players = multiplayerState.players.map((player) => ({
@@ -946,7 +1027,12 @@ elements.joinRoomBtn.addEventListener("click", startJoinRoom);
 elements.refreshLeaderboardBtn.addEventListener("click", fetchLeaderboard);
 elements.leaveRoomBtn.addEventListener("click", () => {
   suppressNextRoomLeft = false;
+  saveCurrentMultiplayerProgress("Room progress saved on this device.");
   network?.leaveRoom();
+});
+elements.reviveBtn.addEventListener("click", () => {
+  network?.requestRespawn();
+  setStatus(elements.roomStatus, "Trying to respawn you now...");
 });
 
 elements.roomCodeInput.addEventListener("input", () => {

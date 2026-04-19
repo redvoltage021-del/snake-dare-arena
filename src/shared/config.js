@@ -7,6 +7,7 @@ export const CANVAS_HEIGHT = GRID_HEIGHT * CELL_SIZE;
 export const ROOM_TICK_MS = 80;
 export const BASE_MOVE_INTERVAL = 160;
 export const SPEED_MOVE_INTERVAL = 95;
+export const ROOM_RESPAWN_DELAY_MS = 3000;
 
 export const FOOD_SCORE = 1;
 export const POWER_UP_SPAWN_INTERVAL_MS = 9000;
@@ -29,6 +30,25 @@ export const SNAKE_COLOR_OPTIONS = [
 ];
 
 export const PLAYER_COLORS = SNAKE_COLOR_OPTIONS;
+
+export const DEFAULT_ROOM_RESPAWN_MODE = "auto";
+export const ROOM_RESPAWN_MODES = {
+  auto: {
+    id: "auto",
+    label: "Auto Respawn",
+    description: "Players return automatically after a short reboot."
+  },
+  manual: {
+    id: "manual",
+    label: "Revive Now",
+    description: "Players choose when to jump back in after a wipe."
+  },
+  none: {
+    id: "none",
+    label: "Elimination",
+    description: "Deaths are final until the room restarts."
+  }
+};
 
 export const DIRECTIONS = {
   up: {

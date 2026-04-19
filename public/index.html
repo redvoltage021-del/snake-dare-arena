@@ -4,7 +4,7 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Snake Dare Arena</title>
-    <link rel="stylesheet" href="/styles.css?v=20260328c" />
+    <link rel="stylesheet" href="/styles.css?v=20260419a" />
   </head>
   <body data-mode="menu" data-overlay="visible">
     <main class="app-shell">
@@ -118,6 +118,11 @@
             <button id="createRoomBtn" type="button">Create Room</button>
           </div>
 
+          <div class="detail-block compact room-option-block">
+            <span>Room Respawn</span>
+            <div id="respawnModePicker" class="option-picker"></div>
+          </div>
+
           <div class="join-row">
             <input id="roomCodeInput" type="text" maxlength="6" placeholder="ROOM CODE" />
             <button id="joinRoomBtn" class="ghost" type="button">Join Room</button>
@@ -126,6 +131,8 @@
           <p id="roomStatus" class="inline-status">
             Sign in on this device to unlock solo and multiplayer.
           </p>
+
+          <a class="game-link" href="/bagh-chal">Open Bagh-Chal</a>
         </div>
 
         <div class="card hud-card">
@@ -171,6 +178,7 @@
 
           <div class="mission-actions">
             <button id="leaveRoomBtn" class="ghost small" type="button" hidden>Leave Room</button>
+            <button id="reviveBtn" class="ghost small" type="button" hidden>Revive Now</button>
             <button id="restartBtn" class="accent small" type="button" hidden>Restart Solo</button>
           </div>
         </div>
@@ -200,6 +208,6 @@
     </main>
 
     <script src="/socket.io/socket.io.js"></script>
-    <script type="module" src="/js/app.js?v=20260328c"></script>
+    <script type="module" src="/js/app.js?v=20260419a"></script>
   </body>
 </html>

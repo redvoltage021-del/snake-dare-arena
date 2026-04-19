@@ -56,6 +56,16 @@ app.get("/health", (_req, res) => {
   res.status(200).json({ ok: true });
 });
 
+app.get("/bagh-chal", (_req, res) => {
+  res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate");
+  res.sendFile(path.join(__dirname, "public", "bagh-chal.html"));
+});
+
+app.get("/snake", (_req, res) => {
+  res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate");
+  res.sendFile(path.join(__dirname, "public", "index.html"));
+});
+
 app.post("/api/legacy-auth/login", (req, res) => {
   try {
     if (!legacyUserStore) {
@@ -75,10 +85,10 @@ app.get(/^\/(?!api\/|socket\.io\/|shared\/|health$).*/, (_req, res) => {
 });
 
 io.on("connection", (socket) => {
-  socket.on("createRoom", ({ playerProfile } = {}) => {
+  socket.on("createRoom", ({ playerProfile, roomOptions } = {}) => {
     try {
-      const room = roomManager.createRoom(socket, normalizePlayerProfile(playerProfile, socket.id));
-      socket.emit("roomCreated", { roomCode: room.code });
+      const room = roomManager.createRoom(socket, normalizePlayerProfile(playerProfile, socket.id), roomOptions);
+      socket.emit("roomCreated", { roomCode: room.code, respawnMode: room.respawnMode });
     } catch (error) {
       socket.emit("roomError", { message: error.message || "Unable to create room." });
     }
@@ -87,7 +97,7 @@ io.on("connection", (socket) => {
   socket.on("joinRoom", ({ code, playerProfile } = {}) => {
     try {
       const room = roomManager.joinRoom(socket, code, normalizePlayerProfile(playerProfile, socket.id));
-      socket.emit("roomJoined", { roomCode: room.code });
+      socket.emit("roomJoined", { roomCode: room.code, respawnMode: room.respawnMode });
     } catch (error) {
       socket.emit("roomError", { message: error.message || "Unable to join room." });
     }
@@ -102,6 +112,10 @@ io.on("connection", (socket) => {
     roomManager.setDirection(socket.id, direction);
   });
 
+  socket.on("requestRespawn", () => {
+    roomManager.requestRespawn(socket.id);
+  });
+
   socket.on("disconnect", () => {
     roomManager.handleDisconnect(socket.id);
   });
@@ -111,5 +125,5 @@ const PORT = process.env.PORT || 3000;
 const HOST = process.env.HOST || "0.0.0.0";
 
 server.listen(PORT, HOST, () => {
-  console.log(`Snake Dare Arena live on http://localhost:${PORT}`);
+  console.log(`Snake Lodu Arcade live on http://localhost:${PORT}`);
 });

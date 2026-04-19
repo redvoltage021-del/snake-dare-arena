@@ -1,11 +1,14 @@
 import {
   BASE_MOVE_INTERVAL,
+  DEFAULT_ROOM_RESPAWN_MODE,
   DARE_COOLDOWN_MS,
   FOOD_SCORE,
   GRID_HEIGHT,
   GRID_WIDTH,
   PLAYER_COLORS,
   POWER_UP_DESPAWN_MS,
+  ROOM_RESPAWN_DELAY_MS,
+  ROOM_RESPAWN_MODES,
   POWER_UP_SPAWN_INTERVAL_MS,
   POWER_UP_TYPES,
   ROOM_TICK_MS,
@@ -29,18 +32,43 @@ function cloneSegments(segments) {
   return segments.map((segment) => ({ ...segment }));
 }
 
+function oppositeDirection(direction) {
+  if (direction === "up") {
+    return "down";
+  }
+
+  if (direction === "down") {
+    return "up";
+  }
+
+  if (direction === "left") {
+    return "right";
+  }
+
+  return "left";
+}
+
 export class MultiplayerRoom {
-  constructor({ code, io, leaderboardManager, onEmpty }) {
+  constructor({ code, roomOptions = {}, io, leaderboardManager, onEmpty }) {
     this.code = code;
     this.io = io;
     this.leaderboardManager = leaderboardManager;
     this.onEmpty = onEmpty;
+    this.respawnMode = this.normalizeRespawnMode(roomOptions.respawnMode);
     this.players = new Map();
     this.food = null;
     this.powerUp = null;
     this.nextPowerUpAt = Date.now() + POWER_UP_SPAWN_INTERVAL_MS;
     this.interval = null;
     this.lastTickAt = Date.now();
+  }
+
+  normalizeRespawnMode(mode) {
+    return ROOM_RESPAWN_MODES[mode] ? mode : DEFAULT_ROOM_RESPAWN_MODE;
+  }
+
+  usesRespawns() {
+    return this.respawnMode === "auto" || this.respawnMode === "manual";
   }
 
   addPlayer(socket, playerProfile) {
@@ -102,6 +130,31 @@ export class MultiplayerRoom {
     this.resolveDareState(player, Date.now());
   }
 
+  requestRespawn(socketId) {
+    if (this.respawnMode !== "manual") {
+      return;
+    }
+
+    const player = this.players.get(socketId);
+    if (!player || player.alive) {
+      return;
+    }
+
+    const now = Date.now();
+    if (player.lastRespawnRequestAt && now - player.lastRespawnRequestAt < 500) {
+      return;
+    }
+
+    player.lastRespawnRequestAt = now;
+    if (!this.respawnPlayer(player, now, { manual: true })) {
+      this.pushMessage(player, "No safe spawn yet. Try Revive Now again.");
+      this.broadcastState(now);
+      return;
+    }
+
+    this.broadcastState(now);
+  }
+
   ensureLoop() {
     if (this.interval) {
       return;
@@ -130,13 +183,7 @@ export class MultiplayerRoom {
       previousSegments: cloneSegments(spawn.segments),
       direction: spawn.direction,
       nextDirection: spawn.direction,
-      directionOpposite: spawn.direction === "up"
-        ? "down"
-        : spawn.direction === "down"
-          ? "up"
-          : spawn.direction === "left"
-            ? "right"
-            : "left",
+      directionOpposite: oppositeDirection(spawn.direction),
       score: 0,
       alive: true,
       accumulator: 0,
@@ -146,11 +193,13 @@ export class MultiplayerRoom {
       dare: createDare({ score: 0, now }),
       nextDareAt: now + POWER_UP_SPAWN_INTERVAL_MS,
       feed: [],
-      scoreSubmitted: false
+      scoreSubmitted: false,
+      respawnAt: 0,
+      lastRespawnRequestAt: 0
     };
   }
 
-  findSpawnSnake() {
+  findSpawnSnake({ allowFallback = true } = {}) {
     const occupied = buildOccupiedSet(
       [...this.players.values()].filter((player) => player.alive).map((player) => player.segments)
     );
@@ -184,7 +233,46 @@ export class MultiplayerRoom {
       }
     }
 
-    return createStartingSnake(0);
+    return allowFallback ? createStartingSnake(0) : null;
+  }
+
+  maybeRespawnPlayers(now) {
+    if (this.respawnMode !== "auto") {
+      return;
+    }
+
+    this.players.forEach((player) => {
+      if (player.alive || !player.respawnAt || now < player.respawnAt) {
+        return;
+      }
+
+      if (!this.respawnPlayer(player, now, { manual: false })) {
+        player.respawnAt = now + 500;
+      }
+    });
+  }
+
+  respawnPlayer(player, now, { manual = false } = {}) {
+    const spawn = this.findSpawnSnake({ allowFallback: false });
+    if (!spawn) {
+      return false;
+    }
+
+    player.alive = true;
+    player.segments = spawn.segments;
+    player.previousSegments = cloneSegments(spawn.segments);
+    player.direction = spawn.direction;
+    player.nextDirection = spawn.direction;
+    player.directionOpposite = oppositeDirection(spawn.direction);
+    player.accumulator = 0;
+    player.speedUntil = 0;
+    player.doubleUntil = 0;
+    player.shieldCharges = Math.max(player.shieldCharges, 1);
+    player.respawnAt = 0;
+    player.dare = createDare({ score: player.score, now });
+    player.nextDareAt = now + DARE_COOLDOWN_MS;
+    this.pushMessage(player, manual ? "Manual revive complete. Shield deployed." : "Auto respawn complete. Shield deployed.");
+    return true;
   }
 
   tick() {
@@ -195,6 +283,7 @@ export class MultiplayerRoom {
     const now = Date.now();
     const delta = Math.min(200, Math.max(ROOM_TICK_MS, now - this.lastTickAt));
     this.lastTickAt = now;
+    this.maybeRespawnPlayers(now);
 
     const alivePlayers = [...this.players.values()].filter((player) => player.alive);
     let maxSteps = 0;
@@ -226,7 +315,7 @@ export class MultiplayerRoom {
 
     this.players.forEach((player) => this.resolveDareState(player, now));
     const survivors = this.getAlivePlayers();
-    if (survivors.length === 1 && this.players.size > 1) {
+    if (!this.usesRespawns() && survivors.length === 1 && this.players.size > 1) {
       this.submitScore(survivors[0], "Multiplayer");
     }
     this.broadcastState(now);
@@ -244,13 +333,7 @@ export class MultiplayerRoom {
         player.direction = player.nextDirection;
       }
 
-      player.directionOpposite = player.direction === "up"
-        ? "down"
-        : player.direction === "down"
-          ? "up"
-          : player.direction === "left"
-            ? "right"
-            : "left";
+      player.directionOpposite = oppositeDirection(player.direction);
 
       const vector = player.direction === "up"
         ? { x: 0, y: -1 }
@@ -324,7 +407,7 @@ export class MultiplayerRoom {
         this.pushMessage(plan.player, "Shield burned to block a crash.");
         blocked.set(plan.player.id, "shielded");
       } else {
-        this.killPlayer(plan.player, reason);
+        this.killPlayer(plan.player, reason, now);
       }
     });
 
@@ -359,10 +442,28 @@ export class MultiplayerRoom {
     }
   }
 
-  killPlayer(player, reason) {
+  killPlayer(player, reason, now = Date.now()) {
     player.alive = false;
+    player.accumulator = 0;
+    player.speedUntil = 0;
+    player.doubleUntil = 0;
+    player.dare = null;
+    player.nextDareAt = now + DARE_COOLDOWN_MS;
+    player.previousSegments = [];
     player.segments = [];
+    player.respawnAt = this.respawnMode === "auto" ? now + ROOM_RESPAWN_DELAY_MS : 0;
     this.pushMessage(player, reason === "head_on" ? "Head-on crash." : "Eliminated.");
+
+    if (this.respawnMode === "auto") {
+      this.pushMessage(player, `Auto respawn armed for ${formatTimeLeft(ROOM_RESPAWN_DELAY_MS)}.`);
+      return;
+    }
+
+    if (this.respawnMode === "manual") {
+      this.pushMessage(player, "Revive ready. Tap Revive Now when you want back in.");
+      return;
+    }
+
     this.submitScore(player, "Multiplayer");
   }
 
@@ -501,8 +602,12 @@ export class MultiplayerRoom {
     }));
 
     const aliveCount = players.filter((entry) => entry.alive).length;
-    const winner = aliveCount === 1 ? players.find((entry) => entry.alive) : null;
+    const winner = !this.usesRespawns() && aliveCount === 1 ? players.find((entry) => entry.alive) : null;
     const effects = [];
+    const respawnInMs = !player.alive && this.respawnMode === "auto" && player.respawnAt
+      ? Math.max(0, player.respawnAt - now)
+      : 0;
+    const canReviveNow = !player.alive && this.respawnMode === "manual";
 
     if (player.speedUntil > now) {
       effects.push({
@@ -538,9 +643,26 @@ export class MultiplayerRoom {
           status: "cooldown"
         };
 
+    const statusText = !player.alive
+      ? this.respawnMode === "auto"
+        ? `Rebooting in ${formatTimeLeft(respawnInMs)}.`
+        : this.respawnMode === "manual"
+          ? "Revive ready. Tap Revive Now to rejoin."
+          : "Eliminated. Spectating the arena."
+      : !this.usesRespawns() && aliveCount <= 1 && players.length > 1
+        ? "You own the arena."
+        : players.length === 1
+          ? this.usesRespawns()
+            ? `${ROOM_RESPAWN_MODES[this.respawnMode].label} room primed. Waiting for challengers.`
+            : "Waiting for challengers."
+          : this.usesRespawns()
+            ? `${aliveCount} snakes live. ${ROOM_RESPAWN_MODES[this.respawnMode].label} is active.`
+            : `${aliveCount} snakes still moving.`;
+
     return {
       mode: "multiplayer",
       roomCode: this.code,
+      respawnMode: this.respawnMode,
       food: this.food,
       powerUp: this.powerUp,
       players,
@@ -553,14 +675,10 @@ export class MultiplayerRoom {
         dare,
         activeEffects: effects,
         notifications: player.feed,
-        statusText: !player.alive
-          ? "Eliminated. Spectating the arena."
-          : aliveCount <= 1 && players.length > 1
-            ? "You own the arena."
-            : players.length === 1
-              ? "Waiting for challengers."
-              : `${aliveCount} snakes still moving.`,
-        shieldCharges: player.shieldCharges
+        statusText,
+        shieldCharges: player.shieldCharges,
+        respawnInMs,
+        canReviveNow
       }
     };
   }

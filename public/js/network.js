@@ -41,8 +41,8 @@ export class MultiplayerClient extends EventTarget {
     });
   }
 
-  createRoom(playerProfile) {
-    this.socket.emit("createRoom", { playerProfile });
+  createRoom(playerProfile, roomOptions = {}) {
+    this.socket.emit("createRoom", { playerProfile, roomOptions });
   }
 
   joinRoom(code, playerProfile) {
@@ -59,5 +59,13 @@ export class MultiplayerClient extends EventTarget {
     }
 
     this.socket.emit("direction", { direction });
+  }
+
+  requestRespawn() {
+    if (!this.roomCode) {
+      return;
+    }
+
+    this.socket.emit("requestRespawn");
   }
 }
