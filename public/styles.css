@@ -133,6 +133,12 @@ body::after {
   background: var(--arena-shell);
 }
 
+.arena-control-dock {
+  width: min(100%, 620px);
+  margin: 0 auto;
+  background: #123742;
+}
+
 .card-header {
   display: flex;
   align-items: flex-start;
@@ -422,6 +428,50 @@ button.small,
   flex-wrap: wrap;
   gap: 10px;
   min-height: 42px;
+}
+
+.control-block {
+  gap: 10px;
+}
+
+.control-hint {
+  margin: 0;
+  color: var(--muted);
+  line-height: 1.5;
+}
+
+.control-pad {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-areas:
+    ". up ."
+    "left down right";
+  gap: 10px;
+}
+
+.control-btn {
+  min-height: 52px;
+  border-radius: 18px;
+  background: #214f5b;
+  color: var(--text);
+  touch-action: manipulation;
+  user-select: none;
+}
+
+.control-btn--up {
+  grid-area: up;
+}
+
+.control-btn--left {
+  grid-area: left;
+}
+
+.control-btn--down {
+  grid-area: down;
+}
+
+.control-btn--right {
+  grid-area: right;
 }
 
 .pill,
@@ -762,6 +812,10 @@ body[data-playing="true"] .canvas-frame {
   max-width: 820px;
 }
 
+body[data-playing="true"] .arena-control-dock {
+  width: min(100%, 620px);
+}
+
 @keyframes hudPulse {
   0% {
     transform: scale(1);
@@ -829,6 +883,10 @@ body[data-playing="true"] .canvas-frame {
 
   .option-picker {
     grid-template-columns: 1fr;
+  }
+
+  .control-pad {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 }
 

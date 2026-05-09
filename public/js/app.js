@@ -53,6 +53,11 @@ const elements = {
   dareValue: document.getElementById("dareValue"),
   roomCodeValue: document.getElementById("roomCodeValue"),
   effectsList: document.getElementById("effectsList"),
+  controlHint: document.getElementById("controlHint"),
+  controlUpBtn: document.getElementById("controlUpBtn"),
+  controlLeftBtn: document.getElementById("controlLeftBtn"),
+  controlDownBtn: document.getElementById("controlDownBtn"),
+  controlRightBtn: document.getElementById("controlRightBtn"),
   statusFeed: document.getElementById("statusFeed"),
   leaderboardList: document.getElementById("leaderboardList"),
   leaderboardCard: document.querySelector(".leaderboard-card"),
@@ -457,6 +462,32 @@ function renderFeed(feed = []) {
     .join("");
 }
 
+function updateControlHint(localState, modeLabel) {
+  if (!elements.controlHint) {
+    return;
+  }
+
+  if (modeLabel === "Solo" && localState?.alive) {
+    elements.controlHint.textContent = localState.phase === "countdown"
+      ? "Opening turn can be queued now. Tap a direction and the run will launch almost immediately."
+      : "Tap the pad or use WASD / arrow keys. One turn is buffered ahead for cleaner steering.";
+    return;
+  }
+
+  if (modeLabel === "Room") {
+    elements.controlHint.textContent = localState?.alive
+      ? "Live room movement works with the pad or WASD / arrow keys."
+      : localState?.canReviveNow
+        ? "You are out for the moment. Use Revive Now, then jump back in."
+        : "Wait for auto respawn or the next room start.";
+    return;
+  }
+
+  elements.controlHint.textContent = authState.user
+    ? "Start a run, then steer with the pad or WASD / arrow keys."
+    : "Quick Play or sign in, then steer with the pad or WASD / arrow keys.";
+}
+
 function updateHud(localState, { modeLabel, roomCode }) {
   const nextScore = String(localState?.score ?? 0);
   const nextTarget = localState?.dare?.target ?? (authState.user
@@ -486,6 +517,7 @@ function updateHud(localState, { modeLabel, roomCode }) {
   elements.roomCodeValue.textContent = nextRoom;
   renderEffects(localState?.activeEffects ?? []);
   renderFeed(localState?.notifications ?? []);
+  updateControlHint(localState, modeLabel);
 }
 
 function renderLeaderboard(entries = []) {
@@ -786,6 +818,33 @@ function ensureNetwork() {
   }
 }
 
+function handleDirectionInput(direction) {
+  if (!direction) {
+    return false;
+  }
+
+  const canControlSolo = activeMode === "solo" && Boolean(soloGame?.alive);
+  const canControlRoom = activeMode === "multiplayer" && Boolean(multiplayerState?.local?.alive);
+
+  if (canControlSolo) {
+    soloGame.queueDirection(direction);
+    focusCanvasWithoutScroll();
+    return true;
+  }
+
+  if (canControlRoom) {
+    network?.sendDirection(direction);
+    focusCanvasWithoutScroll();
+    return true;
+  }
+
+  if (activeMode === "menu") {
+    setStatus(elements.roomStatus, "Start a run first, then steer with the pad or keyboard.");
+  }
+
+  return false;
+}
+
 async function startSoloGame() {
   if (!await ensurePlayableUser()) {
     return;
@@ -812,9 +871,10 @@ async function startSoloGame() {
   elements.restartBtn.hidden = false;
   elements.leaveRoomBtn.hidden = true;
   elements.reviveBtn.hidden = true;
-  setStatus(elements.roomStatus, "Launch sequence armed. Queue your first move.");
+  setStatus(elements.roomStatus, "Launching now. Tap a direction or use WASD / arrow keys.");
   setOverlay(false, "", "");
   triggerArenaZoom();
+  focusCanvasWithoutScroll();
   renderer.triggerImpact({ intensity: 0.2, color: authState.user.snakeColor, duration: 220 });
 }
 
@@ -1092,6 +1152,19 @@ elements.roomCodeInput.addEventListener("keydown", (event) => {
   }
 });
 
+[
+  elements.controlUpBtn,
+  elements.controlLeftBtn,
+  elements.controlDownBtn,
+  elements.controlRightBtn
+].forEach((button) => {
+  button?.addEventListener("click", () => {
+    handleDirectionInput(button.dataset.direction);
+  });
+});
+
+elements.canvasFrame?.addEventListener("pointerdown", focusCanvasWithoutScroll);
+
 document.addEventListener("keydown", (event) => {
   if (event.target instanceof HTMLInputElement || event.target instanceof HTMLTextAreaElement) {
     return;
@@ -1099,19 +1172,11 @@ document.addEventListener("keydown", (event) => {
 
   const direction = KEY_TO_DIRECTION[event.key];
   if (direction) {
-    const canControlSolo = activeMode === "solo" && Boolean(soloGame?.alive);
-    const canControlRoom = activeMode === "multiplayer" && Boolean(multiplayerState?.local?.alive);
-
-    if (!canControlSolo && !canControlRoom) {
+    if (!handleDirectionInput(direction)) {
       return;
     }
 
     event.preventDefault();
-    if (canControlSolo) {
-      soloGame.queueDirection(direction);
-    } else if (canControlRoom) {
-      network?.sendDirection(direction);
-    }
     return;
   }
 

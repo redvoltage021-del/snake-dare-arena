@@ -4,7 +4,7 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Snake Lodu | Snake Dare Arena</title>
-    <link rel="stylesheet" href="/styles.css?v=20260419a" />
+    <link rel="stylesheet" href="/styles.css?v=20260509a" />
   </head>
   <body data-mode="menu" data-overlay="visible">
     <main class="app-shell">
@@ -206,10 +206,23 @@
             </div>
           </div>
         </div>
+
+        <div class="card arena-control-dock">
+          <div class="detail-block compact control-block">
+            <span>Controls</span>
+            <p id="controlHint" class="control-hint">Start a run, then steer with the pad or WASD / arrow keys.</p>
+            <div class="control-pad" aria-label="Snake controls">
+              <button id="controlUpBtn" class="control-btn control-btn--up" data-direction="up" type="button">Up</button>
+              <button id="controlLeftBtn" class="control-btn control-btn--left" data-direction="left" type="button">Left</button>
+              <button id="controlDownBtn" class="control-btn control-btn--down" data-direction="down" type="button">Down</button>
+              <button id="controlRightBtn" class="control-btn control-btn--right" data-direction="right" type="button">Right</button>
+            </div>
+          </div>
+        </div>
       </section>
     </main>
 
     <script src="/socket.io/socket.io.js"></script>
-    <script type="module" src="/js/app.js?v=20260419a"></script>
+    <script type="module" src="/js/app.js?v=20260509a"></script>
   </body>
 </html>

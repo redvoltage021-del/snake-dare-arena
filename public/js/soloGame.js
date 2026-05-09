@@ -20,7 +20,7 @@ import {
   sanitizeName
 } from "/shared/utils.js";
 
-const SOLO_COUNTDOWN_MS = 2200;
+const SOLO_COUNTDOWN_MS = 900;
 const SOLO_MOVE_INTERVAL_FLOOR = 112;
 const SOLO_SPEED_INTERVAL_FLOOR = 76;
 
@@ -77,7 +77,7 @@ export class SoloGame extends EventTarget {
     this.speedUntil = 0;
     this.doubleUntil = 0;
     this.shieldCharges = 0;
-    this.notifications = ["Launch in 3. Queue your opening turn."];
+    this.notifications = ["Launch in 1. Tap a direction or queue an opening turn."];
     this.gameOverReason = "";
     this.powerUp = null;
     this.food = this.spawnFood();
@@ -390,11 +390,9 @@ export class SoloGame extends EventTarget {
     const countdownLabel = countdownVisible
       ? now >= this.countdownEndsAt
         ? "GO"
-        : countdownRemaining > 1400
-          ? "3"
-          : countdownRemaining > 700
-            ? "2"
-            : "1"
+        : countdownRemaining > 450
+          ? "2"
+          : "1"
       : "";
 
     return {
@@ -426,7 +424,7 @@ export class SoloGame extends EventTarget {
         activeEffects: this.getActiveEffects(now),
         notifications: this.notifications,
         statusText: this.phase === "countdown"
-          ? "Launch sequence active."
+          ? "Launching now. Opening turn can be queued."
           : this.alive
             ? "Solo run live. Chain food and clear dares."
             : this.gameOverReason,
