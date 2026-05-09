@@ -3,76 +3,107 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Snake Lodu Arcade | Game Portal</title>
-    <link rel="stylesheet" href="/portal.css?v=20260419a" />
+    <title>Black Phoenix | Game Portal</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Space+Grotesk:wght@500;700&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="/portal.css?v=20260510a" />
   </head>
   <body>
     <main class="portal-shell">
-      <section class="portal-hero">
-        <div class="hero-copy">
-          <p class="eyebrow">Snake Lodu Arcade</p>
-          <h1>Choose your arena, then step into a full game space built for it.</h1>
+      <section class="portal-stage">
+        <div class="portal-atmosphere" aria-hidden="true">
+          <span class="smoke smoke-a"></span>
+          <span class="smoke smoke-b"></span>
+          <span class="smoke smoke-c"></span>
+          <span class="particle particle-a"></span>
+          <span class="particle particle-b"></span>
+          <span class="particle particle-c"></span>
+          <span class="particle particle-d"></span>
+          <div class="phoenix-sigil"></div>
+        </div>
+
+        <section class="hero-pane">
+          <p class="eyebrow">Black Phoenix Gaming Portal</p>
+          <h1>
+            Enter The
+            <span>Black Phoenix</span>
+          </h1>
           <p class="hero-text">
-            Jump into fast neon survival with Snake Dare Arena or settle into the carved-board strategy of Bagh-Chal.
-            Both games now live in their own dedicated pages, with this portal as the switchboard between them.
+            A cinematic launch space for players who want two distinct game moods in one elite command deck.
+            Dive into high-speed survival with Snake Dare Arena or slow the pace down with the board warfare of
+            Bagh-Chal.
           </p>
-        </div>
 
-        <div class="hero-support">
-          <p>One portal. Two very different moods.</p>
           <div class="hero-actions">
-            <a class="hero-link primary" href="/snake">Open Snake</a>
-            <a class="hero-link secondary" href="/bagh-chal">Open Bagh-Chal</a>
+            <a class="hero-button hero-button--primary" href="/snake">Launch Snake</a>
+            <a class="hero-button hero-button--secondary" href="/bagh-chal">Open Bagh-Chal</a>
           </div>
-        </div>
-      </section>
 
-      <section class="game-split" aria-label="Game choices">
-        <article class="game-lane snake-lane">
-          <div class="lane-copy">
-            <p class="lane-kicker">Arcade Survival</p>
-            <h2>Snake Dare Arena</h2>
-            <p class="lane-text">
-              Solo runs, live room battles, dares, power-ups, and device-saved progress in one sharp neon arena.
+          <div class="hero-footer">
+            <div class="hero-stat">
+              <span>Portal</span>
+              <strong>2 Worlds</strong>
+            </div>
+            <div class="hero-stat">
+              <span>Style</span>
+              <strong>Elite Dark UI</strong>
+            </div>
+            <div class="hero-stat">
+              <span>Switch</span>
+              <strong>Instant Route Hop</strong>
+            </div>
+          </div>
+        </section>
+
+        <aside class="launcher-pane" aria-label="Game selection">
+          <figure class="brand-card">
+            <div class="brand-card__glow" aria-hidden="true"></div>
+            <img src="/assets/black-phoenix-logo.jpeg" alt="Black Phoenix logo" />
+            <figcaption>
+              <span>Brand Mark</span>
+              <strong>Black Phoenix</strong>
+              <p>Competitive, mysterious, and built to feel like a premium launcher.</p>
+            </figcaption>
+          </figure>
+
+          <article class="game-card snake-card">
+            <div class="game-card__header">
+              <span class="game-kicker">Arcade Survival</span>
+              <strong>Snake Dare Arena</strong>
+            </div>
+            <p>
+              Neon movement, live rooms, solo dares, power-ups, and device-saved profiles when you want a sharp
+              reflex game.
             </p>
-          </div>
+            <div class="game-tags">
+              <span>Fast</span>
+              <span>Solo + Rooms</span>
+              <span>Competitive</span>
+            </div>
+            <a class="card-link" href="/snake">Enter Snake</a>
+          </article>
 
-          <ul class="lane-points">
-            <li>Solo mode with dares and power-ups</li>
-            <li>Room codes for live multiplayer battles</li>
-            <li>Auto respawn or Revive Now room options</li>
-          </ul>
-
-          <div class="lane-footer">
-            <span class="lane-tag">Fast</span>
-            <a class="lane-link" href="/snake">Enter Snake</a>
-          </div>
-        </article>
-
-        <article class="game-lane baghchal-lane">
-          <div class="lane-copy">
-            <p class="lane-kicker">Traditional Nepali Strategy</p>
-            <h2>Bagh-Chal</h2>
-            <p class="lane-text">
-              Play the classic 4 tigers versus 20 goats board game locally or against AI in its own focused strategy room.
+          <article class="game-card bagh-card">
+            <div class="game-card__header">
+              <span class="game-kicker">Traditional Strategy</span>
+              <strong>Bagh-Chal</strong>
+            </div>
+            <p>
+              Four tigers, twenty goats, AI difficulty modes, and a more thoughtful board game rhythm rooted in Nepali
+              play.
             </p>
-          </div>
-
-          <ul class="lane-points">
-            <li>Local versus mode and AI mode</li>
-            <li>Easy, medium, and hard AI</li>
-            <li>Traditional board with move highlights and match log</li>
-          </ul>
-
-          <div class="lane-footer">
-            <span class="lane-tag">Tactical</span>
-            <a class="lane-link" href="/bagh-chal">Enter Bagh-Chal</a>
-          </div>
-        </article>
-      </section>
-
-      <section class="portal-note">
-        <p>Use this page anytime you want to switch between the two games without mixing their layouts together.</p>
+            <div class="game-tags">
+              <span>Tactical</span>
+              <span>Local + AI</span>
+              <span>Mind Game</span>
+            </div>
+            <a class="card-link" href="/bagh-chal">Enter Bagh-Chal</a>
+          </article>
+        </aside>
       </section>
     </main>
   </body>

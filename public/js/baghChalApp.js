@@ -35,6 +35,7 @@ const elements = {
   selectionLabel: document.getElementById("selectionLabel"),
   statusLine: document.getElementById("statusLine"),
   moveLog: document.getElementById("moveLog"),
+  toastStack: document.getElementById("toastStack"),
   winnerBanner: document.getElementById("winnerBanner"),
   winnerTitle: document.getElementById("winnerTitle"),
   winnerText: document.getElementById("winnerText"),
@@ -81,7 +82,11 @@ class FolkMusicController {
     this.intervalId = null;
     this.enabled = false;
     this.phraseIndex = 0;
-    this.melody = [220, 246.94, 293.66, 329.63, 293.66, 246.94];
+    this.phrases = [
+      [293.66, 349.23, 392, 440, 392, 349.23],
+      [293.66, 392, 440, 523.25, 440, 392],
+      [261.63, 293.66, 349.23, 392, 349.23, 293.66]
+    ];
   }
 
   async toggle() {
@@ -110,7 +115,7 @@ class FolkMusicController {
     this.button.textContent = "Music On";
     this.button.setAttribute("aria-pressed", "true");
     this.schedulePhrase();
-    this.intervalId = window.setInterval(() => this.schedulePhrase(), 2600);
+    this.intervalId = window.setInterval(() => this.schedulePhrase(), 3400);
   }
 
   stop() {
@@ -130,29 +135,107 @@ class FolkMusicController {
     }
 
     const start = this.context.currentTime + 0.05;
-    this.playTone(110, start, 2.2, 0.018, "sine");
-    this.playTone(165, start, 2.2, 0.012, "triangle");
+    const phrase = this.phrases[this.phraseIndex % this.phrases.length];
 
-    for (let index = 0; index < 4; index += 1) {
-      const note = this.melody[(this.phraseIndex + index) % this.melody.length];
-      this.playTone(note, start + index * 0.38, 0.28, 0.02, "triangle");
-    }
+    this.playDrone(146.83, start, 3.15, 0.012);
+    this.playDrone(220, start, 3.15, 0.007);
+    this.playBell(293.66, start + 0.16, 0.1, 0.008);
 
-    this.phraseIndex = (this.phraseIndex + 1) % this.melody.length;
+    phrase.forEach((note, index) => {
+      const phraseStart = start + index * 0.44;
+      const duration = index === phrase.length - 1 ? 0.6 : 0.34;
+      this.playFlute(note, phraseStart, duration, 0.024);
+
+      if (index % 2 === 0) {
+        this.playPluck(Math.max(110, note / 2), phraseStart, 0.14, 0.012);
+      }
+    });
+
+    this.playPluck(196, start + 2.72, 0.18, 0.014);
+    this.phraseIndex = (this.phraseIndex + 1) % this.phrases.length;
   }
 
-  playTone(frequency, time, duration, gainAmount, type) {
-    const oscillator = this.context.createOscillator();
-    const gainNode = this.context.createGain();
+  playDrone(frequency, time, duration, gainAmount) {
+    const base = this.context.createOscillator();
+    const overtone = this.context.createOscillator();
     const filter = this.context.createBiquadFilter();
+    const gainNode = this.context.createGain();
 
-    oscillator.type = type;
-    oscillator.frequency.setValueAtTime(frequency, time);
+    base.type = "triangle";
+    overtone.type = "sine";
+    base.frequency.setValueAtTime(frequency, time);
+    overtone.frequency.setValueAtTime(frequency * 2, time);
     filter.type = "lowpass";
-    filter.frequency.setValueAtTime(900, time);
+    filter.frequency.setValueAtTime(420, time);
 
     gainNode.gain.setValueAtTime(0.0001, time);
-    gainNode.gain.exponentialRampToValueAtTime(gainAmount, time + 0.05);
+    gainNode.gain.exponentialRampToValueAtTime(gainAmount, time + 0.12);
+    gainNode.gain.exponentialRampToValueAtTime(0.0001, time + duration);
+
+    base.connect(filter);
+    overtone.connect(filter);
+    filter.connect(gainNode);
+    gainNode.connect(this.context.destination);
+
+    base.start(time);
+    overtone.start(time);
+    base.stop(time + duration + 0.08);
+    overtone.stop(time + duration + 0.08);
+  }
+
+  playFlute(frequency, time, duration, gainAmount) {
+    const lead = this.context.createOscillator();
+    const air = this.context.createOscillator();
+    const vibrato = this.context.createOscillator();
+    const vibratoGain = this.context.createGain();
+    const filter = this.context.createBiquadFilter();
+    const gainNode = this.context.createGain();
+
+    lead.type = "triangle";
+    air.type = "sine";
+    vibrato.type = "sine";
+    lead.frequency.setValueAtTime(frequency, time);
+    air.frequency.setValueAtTime(frequency * 1.01, time);
+    vibrato.frequency.setValueAtTime(5.4, time);
+    vibratoGain.gain.setValueAtTime(6, time);
+    filter.type = "lowpass";
+    filter.frequency.setValueAtTime(1200, time);
+    filter.Q.setValueAtTime(1.6, time);
+
+    vibrato.connect(vibratoGain);
+    vibratoGain.connect(lead.detune);
+    vibratoGain.connect(air.detune);
+
+    gainNode.gain.setValueAtTime(0.0001, time);
+    gainNode.gain.linearRampToValueAtTime(gainAmount, time + 0.08);
+    gainNode.gain.exponentialRampToValueAtTime(Math.max(0.0001, gainAmount * 0.52), time + duration * 0.55);
+    gainNode.gain.exponentialRampToValueAtTime(0.0001, time + duration);
+
+    lead.connect(filter);
+    air.connect(filter);
+    filter.connect(gainNode);
+    gainNode.connect(this.context.destination);
+
+    lead.start(time);
+    air.start(time);
+    vibrato.start(time);
+    lead.stop(time + duration + 0.08);
+    air.stop(time + duration + 0.08);
+    vibrato.stop(time + duration + 0.08);
+  }
+
+  playPluck(frequency, time, duration, gainAmount) {
+    const oscillator = this.context.createOscillator();
+    const filter = this.context.createBiquadFilter();
+    const gainNode = this.context.createGain();
+
+    oscillator.type = "triangle";
+    oscillator.frequency.setValueAtTime(frequency, time);
+    filter.type = "lowpass";
+    filter.frequency.setValueAtTime(780, time);
+    filter.Q.setValueAtTime(1.2, time);
+
+    gainNode.gain.setValueAtTime(gainAmount, time);
     gainNode.gain.exponentialRampToValueAtTime(0.0001, time + duration);
 
     oscillator.connect(filter);
@@ -161,6 +244,27 @@ class FolkMusicController {
 
     oscillator.start(time);
     oscillator.stop(time + duration + 0.04);
+  }
+
+  playBell(frequency, time, duration, gainAmount) {
+    const oscillator = this.context.createOscillator();
+    const filter = this.context.createBiquadFilter();
+    const gainNode = this.context.createGain();
+
+    oscillator.type = "sine";
+    oscillator.frequency.setValueAtTime(frequency * 2, time);
+    filter.type = "bandpass";
+    filter.frequency.setValueAtTime(1600, time);
+
+    gainNode.gain.setValueAtTime(gainAmount, time);
+    gainNode.gain.exponentialRampToValueAtTime(0.0001, time + duration);
+
+    oscillator.connect(filter);
+    filter.connect(gainNode);
+    gainNode.connect(this.context.destination);
+
+    oscillator.start(time);
+    oscillator.stop(time + duration + 0.05);
   }
 }
 
@@ -181,6 +285,11 @@ class BaghChalApp {
     this.frameHandle = null;
     this.pieceNodes = new Map();
     this.effectNodes = new Map();
+    this.pieceFeedback = new Map();
+    this.toasts = [];
+    this.toastId = 0;
+    this.lastWinnerAnnounced = null;
+    this.lastAiTurnToastKey = "";
     this.music = new FolkMusicController(elements.musicToggleBtn);
     this.aiWorker = this.createAiWorker();
     this.lastFrameTime = performance.now();
@@ -271,6 +380,12 @@ class BaghChalApp {
     if (payload.error) {
       this.renderStatus();
       elements.statusLine.textContent = "AI hit a snag. Try the move again or start a new match.";
+      this.pushToast({
+        title: "AI Error",
+        message: "The AI could not finish its turn cleanly. Start a new match or try again.",
+        tone: "warning",
+        duration: 2600
+      });
       return;
     }
 
@@ -393,6 +508,8 @@ class BaghChalApp {
     this.aiPending = false;
     this.aiRequestId += 1;
     this.pendingAiJob = null;
+    this.pieceFeedback.clear();
+    this.lastAiTurnToastKey = "";
     this.cancelTask("ai-turn");
     this.resetAiWorker();
   }
@@ -400,9 +517,63 @@ class BaghChalApp {
   resetGame() {
     this.state = createInitialState();
     this.effects = [];
+    this.toasts = [];
+    this.lastWinnerAnnounced = null;
     this.clearTransientState();
     this.render();
     this.scheduleAiTurnIfNeeded();
+  }
+
+  pushToast({ title, message, tone = "info", duration = 2400 }) {
+    const id = `toast-${this.toastId += 1}`;
+    this.toasts = [...this.toasts.slice(-2), { id, title, message, tone }];
+    this.renderToasts();
+
+    this.schedule(duration, () => {
+      this.toasts = this.toasts.filter((toast) => toast.id !== id);
+      this.renderToasts();
+    }, id);
+  }
+
+  renderToasts() {
+    elements.toastStack.innerHTML = this.toasts
+      .map((toast) => `
+        <article class="toast toast--${toast.tone}">
+          <strong>${toast.title}</strong>
+          <p>${toast.message}</p>
+        </article>
+      `)
+      .join("");
+  }
+
+  triggerPieceFeedback(pieceId, kind = "feedback-blocked", duration = 420) {
+    this.pieceFeedback.set(pieceId, kind);
+    this.render();
+
+    this.schedule(duration, () => {
+      this.pieceFeedback.delete(pieceId);
+    }, `piece-feedback-${pieceId}`);
+  }
+
+  announceWinnerIfNeeded() {
+    if (!this.state.winner) {
+      this.lastWinnerAnnounced = null;
+      return;
+    }
+
+    if (this.lastWinnerAnnounced === this.state.winner) {
+      return;
+    }
+
+    this.lastWinnerAnnounced = this.state.winner;
+    this.pushToast({
+      title: this.state.winner === "goat" ? "Goats Win" : "Tigers Win",
+      message: this.state.winner === "goat"
+        ? "Every tiger is trapped. The herd closes the board."
+        : "Five goats were captured. The tigers break the defense.",
+      tone: "success",
+      duration: 3200
+    });
   }
 
   isAiTurn() {
@@ -430,6 +601,22 @@ class BaghChalApp {
     const requestId = ++this.aiRequestId;
     const stateSnapshot = this.cloneStateForAi(this.state);
     this.pendingAiJob = { requestId, stateSnapshot };
+
+    const aiToastKey = `${this.state.moveCount}-${this.state.turn}-${this.state.phase}-${this.difficulty}`;
+    if (this.lastAiTurnToastKey !== aiToastKey) {
+      this.lastAiTurnToastKey = aiToastKey;
+      this.pushToast({
+        title: "AI Turn",
+        message: this.state.turn === "goat"
+          ? this.state.phase === "placement"
+            ? "The AI is placing the next goat."
+            : "The AI is tightening the net around the tigers."
+          : "The AI is reading the tiger lines for a capture or escape.",
+        tone: "info",
+        duration: 1800
+      });
+    }
+
     this.renderStatus();
 
     this.schedule(180, () => {
@@ -462,6 +649,7 @@ class BaghChalApp {
     }
 
     this.render();
+    this.announceWinnerIfNeeded();
     this.scheduleAiTurnIfNeeded();
   }
 
@@ -488,10 +676,33 @@ class BaghChalApp {
     }
 
     if (piece.type === "goat" && this.state.phase === "placement") {
+      this.selectedPieceId = pieceId;
+      this.triggerPieceFeedback(pieceId);
+      this.pushToast({
+        title: "Placement Phase",
+        message: "Place all 20 goats before moving goats across the board.",
+        tone: "warning"
+      });
+      this.render();
       return;
     }
 
-    this.selectedPieceId = this.selectedPieceId === pieceId ? null : pieceId;
+    const selectingPiece = this.selectedPieceId !== pieceId;
+    this.selectedPieceId = selectingPiece ? pieceId : null;
+
+    if (selectingPiece) {
+      const moves = getActionsForSelection(this.state, pieceId);
+      if (!moves.length) {
+        const position = fromIndex(piece.position).label;
+        this.triggerPieceFeedback(pieceId);
+        this.pushToast({
+          title: "No Escape Route",
+          message: `${piece.type === "tiger" ? "Tiger" : "Goat"} at ${position} is trapped and has no legal move.`,
+          tone: "warning"
+        });
+      }
+    }
+
     this.render();
   }
 
@@ -623,6 +834,10 @@ class BaghChalApp {
         }
 
         node.className = `piece ${piece.type}${isSelected ? " selected" : ""}`;
+        const feedbackClass = this.pieceFeedback.get(piece.id);
+        if (feedbackClass) {
+          node.className += ` ${feedbackClass}`;
+        }
         node.style.left = `${point.x}%`;
         node.style.top = `${point.y}%`;
         node.setAttribute("aria-label", label);
@@ -708,7 +923,9 @@ class BaghChalApp {
 
     if (selectedPiece) {
       const position = fromIndex(selectedPiece.position);
-      elements.selectionLabel.textContent = `${selectedPiece.type === "tiger" ? "Tiger" : "Goat"} at ${position.label} - ${selectedMoves.length} moves`;
+      elements.selectionLabel.textContent = selectedMoves.length
+        ? `${selectedPiece.type === "tiger" ? "Tiger" : "Goat"} at ${position.label} - ${selectedMoves.length} moves`
+        : `${selectedPiece.type === "tiger" ? "Tiger" : "Goat"} at ${position.label} - trapped`;
     } else if (this.state.turn === "goat" && this.state.phase === "placement" && this.canHumanAct()) {
       elements.selectionLabel.textContent = "Placement phase - choose any empty point.";
     } else {
@@ -762,6 +979,7 @@ class BaghChalApp {
     this.renderStatus();
     this.renderActions();
     this.renderPieces();
+    this.renderToasts();
   }
 
   describeState() {
