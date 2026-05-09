@@ -38,6 +38,7 @@ const elements = {
   winnerBanner: document.getElementById("winnerBanner"),
   winnerTitle: document.getElementById("winnerTitle"),
   winnerText: document.getElementById("winnerText"),
+  board: document.getElementById("baghChalBoard"),
   boardLines: document.getElementById("boardLines"),
   boardPoints: document.getElementById("boardPoints"),
   moveLayer: document.getElementById("moveLayer"),
@@ -209,6 +210,7 @@ class BaghChalApp {
 
     elements.newGameBtn.addEventListener("click", () => this.resetGame());
     elements.musicToggleBtn.addEventListener("click", () => this.music.toggle());
+    elements.board.addEventListener("click", (event) => this.handleBoardSurfaceClick(event));
     window.addEventListener("beforeunload", () => {
       this.aiWorker?.terminate();
     });
@@ -493,6 +495,52 @@ class BaghChalApp {
     this.render();
   }
 
+  getNearestBoardPoint(event) {
+    const rect = elements.board.getBoundingClientRect();
+    if (!rect.width || !rect.height) {
+      return null;
+    }
+
+    const localX = event.clientX - rect.left;
+    const localY = event.clientY - rect.top;
+    const threshold = Math.max(22, rect.width * 0.08);
+    let nearestPoint = null;
+    let nearestDistance = Number.POSITIVE_INFINITY;
+
+    BOARD_LAYOUT.forEach((point) => {
+      const pointX = rect.width * (point.x / 100);
+      const pointY = rect.height * (point.y / 100);
+      const distance = Math.hypot(localX - pointX, localY - pointY);
+
+      if (distance < nearestDistance) {
+        nearestDistance = distance;
+        nearestPoint = point.index;
+      }
+    });
+
+    return nearestDistance <= threshold ? nearestPoint : null;
+  }
+
+  handleBoardSurfaceClick(event) {
+    const clickedControl = event.target.closest("[data-point], [data-piece-id]");
+    if (clickedControl || !this.canHumanAct()) {
+      return;
+    }
+
+    const nearestPoint = this.getNearestBoardPoint(event);
+    if (nearestPoint === null) {
+      return;
+    }
+
+    const pieceId = this.state.board[nearestPoint];
+    if (pieceId && this.state.pieces[pieceId]?.type === this.state.turn) {
+      this.handlePieceClick(pieceId);
+      return;
+    }
+
+    this.handlePointClick(nearestPoint);
+  }
+
   handlePointClick(position) {
     if (!this.canHumanAct()) {
       return;
@@ -687,18 +735,18 @@ class BaghChalApp {
           elements.goalLabel.textContent = "Place goats on strong junctions and choke the tiger lanes.";
           elements.statusLine.textContent = this.aiPending
             ? "The AI is placing a goat."
-            : "Goats place one by one before they can move.";
+            : "Tap any glowing point to place a goat on the board.";
         } else {
           elements.goalLabel.textContent = `Seal escape lines. ${4 - trappedTigers} tiger${4 - trappedTigers === 1 ? "" : "s"} still have room.`;
           elements.statusLine.textContent = this.aiPending
             ? "The AI is finding a blocking move."
-            : "Goats move one step along connected lines to close the net.";
+            : "Tap a goat, then tap a glowing destination to close the net.";
         }
       } else {
         elements.goalLabel.textContent = `Look for exposed goats. Tiger mobility sits at ${tigerMobility}.`;
         elements.statusLine.textContent = this.aiPending
           ? "The AI is reading the board."
-          : "Tigers move one step or jump a goat to capture it.";
+          : "Tap a tiger, then tap a glowing destination or capture jump.";
       }
     }
 

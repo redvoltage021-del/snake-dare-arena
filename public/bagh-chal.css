@@ -14,7 +14,7 @@
   --shadow: 0 24px 48px rgba(0, 0, 0, 0.28);
   --board-size: min(72vw, 720px);
   --piece-size: clamp(54px, 9vw, 82px);
-  --move-size: clamp(18px, 3vw, 28px);
+  --move-size: clamp(26px, 4vw, 38px);
 }
 
 * {
@@ -380,6 +380,7 @@ select {
     inset 0 0 0 2px rgba(255, 239, 214, 0.18),
     inset 0 0 42px rgba(28, 14, 5, 0.35),
     0 28px 54px rgba(0, 0, 0, 0.38);
+  cursor: pointer;
 }
 
 .board::before {
@@ -412,10 +413,10 @@ select {
 
 .board-point {
   position: absolute;
-  width: 10px;
-  height: 10px;
-  margin-left: -5px;
-  margin-top: -5px;
+  width: 18px;
+  height: 18px;
+  margin-left: -9px;
+  margin-top: -9px;
   padding: 0;
   border: 0;
   border-radius: 50%;
