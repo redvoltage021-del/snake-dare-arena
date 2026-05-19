@@ -4,6 +4,7 @@ import fs from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
 import { Server } from "socket.io";
+import { BaghChalRoomManager } from "./src/server/baghChalRoomManager.js";
 import { RoomManager } from "./src/server/roomManager.js";
 import { UserStore } from "./src/server/userStore.js";
 import { SNAKE_COLOR_OPTIONS } from "./src/shared/config.js";
@@ -14,8 +15,14 @@ const __dirname = path.dirname(__filename);
 
 const app = express();
 const server = http.createServer(app);
-const io = new Server(server);
+const io = new Server(server, {
+  cors: {
+    origin: true,
+    methods: ["GET", "POST"]
+  }
+});
 const roomManager = new RoomManager(io);
+const baghChalRoomManager = new BaghChalRoomManager(io);
 const legacyUserFilePath = path.join(__dirname, "data", "users.json");
 const legacyUserStore = fs.existsSync(legacyUserFilePath)
   ? new UserStore({
@@ -36,7 +43,30 @@ function normalizePlayerProfile(profile = {}, socketId = "") {
   };
 }
 
+function normalizeBaghChalProfile(profile = {}) {
+  return {
+    displayName: sanitizeName(profile.displayName, "Black Phoenix")
+  };
+}
+
 app.use(express.json());
+app.use((req, res, next) => {
+  const origin = req.headers.origin;
+
+  if (origin) {
+    res.setHeader("Access-Control-Allow-Origin", origin);
+    res.setHeader("Vary", "Origin");
+    res.setHeader("Access-Control-Allow-Headers", "Content-Type");
+    res.setHeader("Access-Control-Allow-Methods", "GET,POST,OPTIONS");
+  }
+
+  if (req.method === "OPTIONS") {
+    res.status(204).end();
+    return;
+  }
+
+  next();
+});
 app.use(express.static(path.join(__dirname, "public"), {
   etag: false,
   lastModified: false,
@@ -123,6 +153,47 @@ io.on("connection", (socket) => {
 
   socket.on("disconnect", () => {
     roomManager.handleDisconnect(socket.id);
+    baghChalRoomManager.handleDisconnect(socket.id);
+  });
+
+  socket.on("baghChal:createRoom", ({ playerProfile, roomOptions } = {}) => {
+    try {
+      const result = baghChalRoomManager.createRoom(
+        socket,
+        normalizeBaghChalProfile(playerProfile),
+        roomOptions
+      );
+      socket.emit("baghChal:roomCreated", result);
+    } catch (error) {
+      socket.emit("baghChal:error", { message: error.message || "Unable to create the Bagh-Chal room." });
+    }
+  });
+
+  socket.on("baghChal:joinRoom", ({ code, playerProfile, roomOptions } = {}) => {
+    try {
+      const result = baghChalRoomManager.joinRoom(
+        socket,
+        code,
+        normalizeBaghChalProfile(playerProfile),
+        roomOptions
+      );
+      socket.emit("baghChal:roomJoined", result);
+    } catch (error) {
+      socket.emit("baghChal:error", { message: error.message || "Unable to join the Bagh-Chal room." });
+    }
+  });
+
+  socket.on("baghChal:leaveRoom", () => {
+    baghChalRoomManager.leaveRoom(socket);
+    socket.emit("baghChal:roomLeft");
+  });
+
+  socket.on("baghChal:action", ({ action } = {}) => {
+    baghChalRoomManager.submitAction(socket.id, action);
+  });
+
+  socket.on("baghChal:requestReset", () => {
+    baghChalRoomManager.requestReset(socket.id);
   });
 });
 

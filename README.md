@@ -1,6 +1,9 @@
-# Snake Dare Arena
+# Black Phoenix Portal
 
-Browser-based snake game with solo challenges, power-ups, and Socket.io multiplayer rooms.
+Browser game portal with:
+
+- `Snake Dare Arena` for arcade survival and room-code multiplayer
+- `Bagh-Chal` for traditional strategy, AI, and new live two-player team-code matches
 
 ## Run locally
 
@@ -8,34 +11,58 @@ Browser-based snake game with solo challenges, power-ups, and Socket.io multipla
 2. Run `npm install`
 3. Run `npm start`
 4. Open `http://localhost:3000`
+5. Use:
+   - `http://localhost:3000/` for the portal
+   - `http://localhost:3000/snake` for Snake
+   - `http://localhost:3000/bagh-chal` for Bagh-Chal
 
-## Deploy online on Render
+## Split Deploy: Vercel + Render
 
-Use the one-click button below after you create your Render account:
+Recommended production setup:
 
-[![Deploy to Render](https://render.com/images/deploy-to-render-button.svg)](https://render.com/deploy?repo=https://github.com/redvoltage021-del/snake-dare-arena)
+- `Vercel` hosts the frontend pages
+- `Render` hosts the Express + Socket.io backend
 
-Manual path:
+### 1. Deploy the backend to Render
 
-1. Sign in to Render and connect your GitHub account.
-2. Create a new Blueprint or Web Service from `redvoltage021-del/snake-dare-arena`.
-3. Render can use the included `render.yaml`, or you can enter these settings manually:
-   - Runtime: `node`
-   - Build Command: `npm install`
-   - Start Command: `node server.js`
-   - Health Check Path: `/health`
-4. After deploy finishes, Render gives you a public `onrender.com` URL.
-5. Share that URL with other players, then anyone can open it and join rooms.
+Use the included `render.yaml`, or create a Node web service manually with:
 
-Notes:
-- This app already reads Render's `PORT` automatically.
-- The server now binds to `0.0.0.0`, which Render requires for public web services.
-- The leaderboard is currently in memory, so online scores reset if the service restarts.
+- Build Command: `npm install`
+- Start Command: `npm start`
+- Health Check Path: `/health`
+
+The default frontend runtime config expects the Render backend at:
+
+- `https://snake-lodu.onrender.com`
+
+If your real Render URL changes, update:
+
+- `public/js/backendConfig.js`
+
+### 2. Deploy the frontend to Vercel
+
+The Vercel frontend should use:
+
+- Project root directory: `public`
+- Framework preset: `Other`
+
+The frontend folder already contains:
+
+- `public/vercel.json` for route rewrites
+- `public/shared/*` for browser-safe shared modules
+- `public/js/backendConfig.js` for the Render backend origin
+
+Once the frontend is on Vercel, Snake and Bagh-Chal will load their realtime/API backend from the Render service automatically through `public/js/backendConfig.js`.
+
+Current live frontend:
+
+- `https://black-phoenix-frontend.vercel.app`
 
 ## Features
 
 - Solo snake gameplay on an HTML canvas grid
 - Dynamic dare system with score, survival, and turn-restriction challenges
 - Power-ups: speed boost, shield, and double score
-- Multiplayer rooms with live snake syncing and snake-vs-snake collisions
-- In-memory leaderboard API
+- Multiplayer snake rooms with live syncing and snake-vs-snake collisions
+- Bagh-Chal local, AI, and online team-code matches for two players
+- In-memory leaderboard API for the snake backend

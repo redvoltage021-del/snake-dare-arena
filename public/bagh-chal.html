@@ -10,7 +10,7 @@
       href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Cormorant+Garamond:wght@600;700&display=swap"
       rel="stylesheet"
     />
-    <link rel="stylesheet" href="/bagh-chal.css?v=20260510a" />
+    <link rel="stylesheet" href="/bagh-chal.css?v=20260519a" />
   </head>
   <body>
     <main class="baghchal-page">
@@ -22,7 +22,8 @@
           <p class="eyebrow">Traditional Nepali Strategy</p>
           <h1>Bagh-Chal <span>बाघ-चाल</span></h1>
           <p class="subtitle">
-            Four tigers. Twenty goats. One carved board where pressure matters more than speed.
+            Four tigers. Twenty goats. One carved board where pressure matters more than speed, now with online
+            team-code duels.
           </p>
         </div>
 
@@ -39,6 +40,7 @@
         <div class="hero-rules">
           <span>Place all 20 goats before moving them.</span>
           <span>Tigers leap over goats to capture.</span>
+          <span>Online matches run through shared team codes.</span>
         </div>
       </section>
 
@@ -93,25 +95,55 @@
               <select id="modeSelect">
                 <option value="local">Player vs Player</option>
                 <option value="ai">Player vs AI</option>
+                <option value="online">Online Multiplayer</option>
               </select>
             </label>
 
-            <label class="field">
+            <label id="difficultyField" class="field">
               <span>AI Difficulty</span>
               <select id="difficultySelect">
-                <option value="easy">Easy · random</option>
-                <option value="medium" selected>Medium · tactical</option>
-                <option value="hard">Hard · minimax</option>
+                <option value="easy">Easy - random</option>
+                <option value="medium" selected>Medium - tactical</option>
+                <option value="hard">Hard - minimax</option>
               </select>
             </label>
 
-            <label class="field">
-              <span>Human Side</span>
+            <label id="sideField" class="field">
+              <span id="sideFieldLabel">Human Side</span>
               <select id="humanSideSelect">
                 <option value="goat">Play as Goats</option>
                 <option value="tiger">Play as Tigers</option>
               </select>
             </label>
+
+            <div id="onlineFields" class="online-fields" hidden>
+              <label class="field">
+                <span>Player Name</span>
+                <input id="onlinePlayerName" type="text" maxlength="18" placeholder="Black Phoenix Player" />
+              </label>
+
+              <label class="field">
+                <span>Team Code</span>
+                <input id="onlineRoomCode" type="text" maxlength="6" placeholder="TEAM01" />
+              </label>
+
+              <div class="online-actions">
+                <button id="createOnlineBtn" class="utility-btn primary" type="button">Create Team Code</button>
+                <button id="joinOnlineBtn" class="utility-btn" type="button">Join Match</button>
+              </div>
+
+              <div class="online-room-meta">
+                <div class="online-room-copy">
+                  <span>Live Team Code</span>
+                  <strong id="onlineRoomBadge">Not connected</strong>
+                </div>
+                <button id="leaveOnlineBtn" class="utility-btn" type="button" hidden>Leave Room</button>
+              </div>
+
+              <p id="onlineStatusLine" class="mode-note compact-note">
+                Create a code, share it, and let the second player join the same live board.
+              </p>
+            </div>
 
             <div class="mode-note" id="modeNote">
               Local mode keeps both sides on this board. Switch to AI when you want solo practice.
@@ -176,6 +208,6 @@
       </section>
     </main>
 
-    <script type="module" src="/js/baghChalApp.js?v=20260510a"></script>
+    <script type="module" src="/js/baghChalApp.js?v=20260519a"></script>
   </body>
 </html>

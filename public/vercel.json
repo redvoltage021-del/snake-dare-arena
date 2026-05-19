@@ -1,0 +1,21 @@
+{
+  "cleanUrls": false,
+  "rewrites": [
+    {
+      "source": "/",
+      "destination": "/index.html"
+    },
+    {
+      "source": "/portal",
+      "destination": "/index.html"
+    },
+    {
+      "source": "/snake",
+      "destination": "/snake.html"
+    },
+    {
+      "source": "/bagh-chal",
+      "destination": "/bagh-chal.html"
+    }
+  ]
+}

@@ -1,14 +1,14 @@
 import { resolveBackendOrigin } from "./backendConfig.js";
 import { ensureSocketIoLoaded } from "./socketLoader.js";
 
-export async function createMultiplayerClient() {
+export async function createBaghChalClient() {
   await ensureSocketIoLoaded();
-  return new MultiplayerClient({
+  return new BaghChalOnlineClient({
     backendOrigin: resolveBackendOrigin()
   });
 }
 
-export class MultiplayerClient extends EventTarget {
+export class BaghChalOnlineClient extends EventTarget {
   constructor({ backendOrigin } = {}) {
     super();
     this.roomCode = null;
@@ -38,12 +38,18 @@ export class MultiplayerClient extends EventTarget {
     this.socket.on("connect", () => this.emitEvent("connect"));
     this.socket.on("disconnect", () => this.emitEvent("disconnect"));
 
-    ["roomCreated", "roomJoined", "roomLeft", "roomState", "roomError"].forEach((eventName) => {
+    [
+      "baghChal:roomCreated",
+      "baghChal:roomJoined",
+      "baghChal:roomLeft",
+      "baghChal:state",
+      "baghChal:error"
+    ].forEach((eventName) => {
       this.socket.on(eventName, (payload = {}) => {
-        if (eventName === "roomCreated" || eventName === "roomJoined") {
+        if (eventName === "baghChal:roomCreated" || eventName === "baghChal:roomJoined") {
           this.roomCode = payload.roomCode;
         }
-        if (eventName === "roomLeft") {
+        if (eventName === "baghChal:roomLeft") {
           this.roomCode = null;
         }
         this.emitEvent(eventName, payload);
@@ -52,30 +58,30 @@ export class MultiplayerClient extends EventTarget {
   }
 
   createRoom(playerProfile, roomOptions = {}) {
-    this.socket.emit("createRoom", { playerProfile, roomOptions });
+    this.socket.emit("baghChal:createRoom", { playerProfile, roomOptions });
   }
 
-  joinRoom(code, playerProfile) {
-    this.socket.emit("joinRoom", { code, playerProfile });
+  joinRoom(code, playerProfile, roomOptions = {}) {
+    this.socket.emit("baghChal:joinRoom", { code, playerProfile, roomOptions });
   }
 
   leaveRoom() {
-    this.socket.emit("leaveRoom");
+    this.socket.emit("baghChal:leaveRoom");
   }
 
-  sendDirection(direction) {
+  submitAction(action) {
     if (!this.roomCode) {
       return;
     }
 
-    this.socket.emit("direction", { direction });
+    this.socket.emit("baghChal:action", { action });
   }
 
-  requestRespawn() {
+  requestReset() {
     if (!this.roomCode) {
       return;
     }
 
-    this.socket.emit("requestRespawn");
+    this.socket.emit("baghChal:requestReset");
   }
 }

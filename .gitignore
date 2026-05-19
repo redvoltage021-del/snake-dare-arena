@@ -3,3 +3,8 @@ npm-debug.log*
 .tools/
 server.out.log
 server.err.log
+
+.vercel
+artifacts/
+playwright-actions.json
+progress.md

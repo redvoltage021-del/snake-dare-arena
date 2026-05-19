@@ -1,7 +1,8 @@
 import { DEFAULT_ROOM_RESPAWN_MODE, KEY_TO_DIRECTION, ROOM_RESPAWN_MODES, SNAKE_COLOR_OPTIONS } from "/shared/config.js";
 import { formatTimeLeft } from "/shared/utils.js";
+import { buildBackendUrl } from "./backendConfig.js";
 import { DeviceStorage } from "./deviceStorage.js";
-import { MultiplayerClient } from "./network.js";
+import { createMultiplayerClient } from "./network.js";
 import { GameRenderer } from "./renderer.js";
 import { SoloGame } from "./soloGame.js";
 
@@ -258,7 +259,7 @@ function resetNetwork() {
 }
 
 async function postJson(path, body) {
-  const response = await fetch(path, {
+  const response = await fetch(buildBackendUrl(path), {
     method: "POST",
     headers: {
       "Content-Type": "application/json"
@@ -794,7 +795,7 @@ async function ensurePlayableUser() {
   return continueAsGuest();
 }
 
-function ensureNetwork() {
+async function ensureNetwork() {
   if (!authState.user) {
     return null;
   }
@@ -803,17 +804,12 @@ function ensureNetwork() {
     return network;
   }
 
-  if (typeof window.io !== "function") {
-    setStatus(elements.roomStatus, "Realtime service is unavailable right now.", true);
-    return null;
-  }
-
   try {
-    network = new MultiplayerClient();
+    network = await createMultiplayerClient();
     bindNetworkEvents(network);
     return network;
-  } catch {
-    setStatus(elements.roomStatus, "Realtime service failed to start.", true);
+  } catch (error) {
+    setStatus(elements.roomStatus, error.message || "Realtime service failed to start.", true);
     return null;
   }
 }
@@ -883,7 +879,7 @@ async function startCreateRoom() {
     return;
   }
 
-  const client = ensureNetwork();
+  const client = await ensureNetwork();
   if (!client) {
     return;
   }
@@ -905,7 +901,7 @@ async function startJoinRoom() {
     return;
   }
 
-  const client = ensureNetwork();
+  const client = await ensureNetwork();
   if (!client) {
     return;
   }

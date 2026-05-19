@@ -16,11 +16,23 @@ import {
   getLivePieces
 } from "./baghChalEngine.js";
 import { getAiMove } from "./baghChalAI.js";
+import { createBaghChalClient } from "./baghChalNetwork.js";
 
 const elements = {
   modeSelect: document.getElementById("modeSelect"),
+  difficultyField: document.getElementById("difficultyField"),
   difficultySelect: document.getElementById("difficultySelect"),
+  sideField: document.getElementById("sideField"),
+  sideFieldLabel: document.getElementById("sideFieldLabel"),
   humanSideSelect: document.getElementById("humanSideSelect"),
+  onlineFields: document.getElementById("onlineFields"),
+  onlinePlayerName: document.getElementById("onlinePlayerName"),
+  onlineRoomCode: document.getElementById("onlineRoomCode"),
+  createOnlineBtn: document.getElementById("createOnlineBtn"),
+  joinOnlineBtn: document.getElementById("joinOnlineBtn"),
+  leaveOnlineBtn: document.getElementById("leaveOnlineBtn"),
+  onlineRoomBadge: document.getElementById("onlineRoomBadge"),
+  onlineStatusLine: document.getElementById("onlineStatusLine"),
   newGameBtn: document.getElementById("newGameBtn"),
   musicToggleBtn: document.getElementById("musicToggleBtn"),
   modeNote: document.getElementById("modeNote"),
@@ -48,7 +60,8 @@ const elements = {
 
 const modeNotes = {
   local: "Local mode keeps both sides on this board. Switch to AI when you want solo practice.",
-  ai: "AI mode lets you take goats or tigers. Hard uses a deeper minimax search, so it plays more patiently."
+  ai: "AI mode lets you take goats or tigers. Hard uses a deeper minimax search, so it plays more patiently.",
+  online: "Online mode creates a shared live board. One player takes goats, the other takes tigers, and both use the same team code."
 };
 
 function pointPercent(point) {
@@ -73,6 +86,15 @@ function formatActor(actor) {
   }
 
   return "System";
+}
+
+function formatSide(side) {
+  return side === "goat" ? "Goats" : "Tigers";
+}
+
+function normalizePlayerName(value) {
+  const clean = String(value ?? "").replace(/\s+/g, " ").trim().slice(0, 18);
+  return clean || "Black Phoenix";
 }
 
 class FolkMusicController {
@@ -293,6 +315,17 @@ class BaghChalApp {
     this.music = new FolkMusicController(elements.musicToggleBtn);
     this.aiWorker = this.createAiWorker();
     this.lastFrameTime = performance.now();
+    this.online = {
+      client: null,
+      roomCode: "",
+      roomState: null,
+      localSide: null,
+      ignoreDisconnect: false
+    };
+
+    if (elements.onlinePlayerName && !elements.onlinePlayerName.value) {
+      elements.onlinePlayerName.value = "Black Phoenix";
+    }
 
     this.renderStaticBoard();
     this.bindEvents();
@@ -303,8 +336,9 @@ class BaghChalApp {
 
   bindEvents() {
     elements.modeSelect.addEventListener("change", () => {
+      const previousMode = this.mode;
       this.mode = elements.modeSelect.value;
-      this.applyModeState();
+      this.applyModeState({ previousMode });
     });
 
     elements.difficultySelect.addEventListener("change", () => {
@@ -319,9 +353,21 @@ class BaghChalApp {
 
     elements.newGameBtn.addEventListener("click", () => this.resetGame());
     elements.musicToggleBtn.addEventListener("click", () => this.music.toggle());
+    elements.createOnlineBtn?.addEventListener("click", () => this.createOnlineRoom());
+    elements.joinOnlineBtn?.addEventListener("click", () => this.joinOnlineRoom());
+    elements.leaveOnlineBtn?.addEventListener("click", () => this.leaveOnlineRoom("You left the online match."));
+    elements.onlineRoomCode?.addEventListener("input", () => {
+      elements.onlineRoomCode.value = elements.onlineRoomCode.value.toUpperCase().replace(/[^A-Z0-9]/g, "");
+    });
+    elements.onlineRoomCode?.addEventListener("keydown", (event) => {
+      if (event.key === "Enter") {
+        this.joinOnlineRoom();
+      }
+    });
     elements.board.addEventListener("click", (event) => this.handleBoardSurfaceClick(event));
     window.addEventListener("beforeunload", () => {
       this.aiWorker?.terminate();
+      this.online.client?.disconnect();
     });
   }
 
@@ -354,6 +400,191 @@ class BaghChalApp {
   resetAiWorker() {
     this.aiWorker?.terminate();
     this.aiWorker = this.createAiWorker();
+  }
+
+  getPlayerName() {
+    return normalizePlayerName(elements.onlinePlayerName?.value);
+  }
+
+  buildOnlineProfile() {
+    return {
+      displayName: this.getPlayerName()
+    };
+  }
+
+  async ensureOnlineClient() {
+    if (this.online.client) {
+      return this.online.client;
+    }
+
+    const client = await createBaghChalClient();
+    this.bindOnlineClient(client);
+    this.online.client = client;
+    return client;
+  }
+
+  bindOnlineClient(client) {
+    client.on("baghChal:roomCreated", ({ roomCode, assignedSide }) => {
+      this.mode = "online";
+      elements.modeSelect.value = "online";
+      this.online.roomCode = roomCode;
+      this.online.localSide = assignedSide;
+      this.applyModeState({ preserveOnlineRoom: true });
+      this.pushToast({
+        title: "Team Code Ready",
+        message: `Room ${roomCode} is live. Share it and wait for the second player.`,
+        tone: "success",
+        duration: 2800
+      });
+    });
+
+    client.on("baghChal:roomJoined", ({ roomCode, assignedSide }) => {
+      this.mode = "online";
+      elements.modeSelect.value = "online";
+      this.online.roomCode = roomCode;
+      this.online.localSide = assignedSide;
+      this.applyModeState({ preserveOnlineRoom: true });
+      this.pushToast({
+        title: "Joined Match",
+        message: `You joined room ${roomCode} as ${formatSide(assignedSide)}.`,
+        tone: "success",
+        duration: 2600
+      });
+    });
+
+    client.on("baghChal:state", (payload) => {
+      const previousMoveCount = this.state.moveCount;
+      this.state = this.cloneStateForAi(payload.gameState);
+      this.selectedPieceId = null;
+      this.online.roomState = payload;
+      this.online.roomCode = payload.roomCode;
+      this.online.localSide = payload.localSide;
+      elements.onlineRoomBadge.textContent = payload.roomCode;
+      elements.onlineRoomCode.value = payload.roomCode;
+      elements.leaveOnlineBtn.hidden = !payload.roomCode;
+      elements.onlineStatusLine.textContent = payload.roomNotice;
+
+      if (this.state.moveCount !== previousMoveCount && this.state.recentMove?.type === "capture") {
+        this.spawnCaptureEffect(this.state.recentMove.over);
+      }
+
+      this.render();
+      this.announceWinnerIfNeeded();
+    });
+
+    client.on("baghChal:roomLeft", () => {
+      this.closeOnlineSession("Create a new code or join another live board.");
+      this.render();
+    });
+
+    client.on("baghChal:error", ({ message }) => {
+      const text = message || "Online move failed.";
+      this.pushToast({
+        title: "Online Match",
+        message: text,
+        tone: "warning",
+        duration: 2600
+      });
+      elements.onlineStatusLine.textContent = text;
+    });
+
+    client.on("disconnect", () => {
+      if (this.online.ignoreDisconnect) {
+        this.online.ignoreDisconnect = false;
+        return;
+      }
+
+      if (this.mode !== "online") {
+        return;
+      }
+
+      this.pushToast({
+        title: "Connection Lost",
+        message: "The live board disconnected. Rejoin the room when the backend wakes up again.",
+        tone: "warning",
+        duration: 2600
+      });
+      elements.onlineStatusLine.textContent = "Connection lost. Rejoin the team code to continue.";
+    });
+  }
+
+  closeOnlineSession(message) {
+    if (this.online.client) {
+      this.online.ignoreDisconnect = true;
+      this.online.client.disconnect();
+      this.online.client = null;
+    }
+
+    this.online.roomCode = "";
+    this.online.roomState = null;
+    this.online.localSide = null;
+    this.state = createInitialState();
+    this.selectedPieceId = null;
+    this.lastWinnerAnnounced = null;
+    elements.onlineRoomBadge.textContent = "Not connected";
+    elements.leaveOnlineBtn.hidden = true;
+    elements.onlineStatusLine.textContent = message;
+
+  }
+
+  async createOnlineRoom() {
+    try {
+      const client = await this.ensureOnlineClient();
+      const preferredSide = elements.humanSideSelect.value;
+      const playerName = this.getPlayerName();
+      elements.onlinePlayerName.value = playerName;
+      client.createRoom(this.buildOnlineProfile(), {
+        preferredSide
+      });
+      elements.onlineStatusLine.textContent = `Creating team code for ${formatSide(preferredSide)}...`;
+    } catch (error) {
+      this.pushToast({
+        title: "Online Match",
+        message: error.message || "The live room service is unavailable right now.",
+        tone: "warning",
+        duration: 2600
+      });
+    }
+  }
+
+  async joinOnlineRoom() {
+    const roomCode = String(elements.onlineRoomCode.value || "").trim().toUpperCase();
+    if (!roomCode) {
+      this.pushToast({
+        title: "Need Team Code",
+        message: "Enter a team code before you try to join the live match.",
+        tone: "warning",
+        duration: 2200
+      });
+      return;
+    }
+
+    try {
+      const client = await this.ensureOnlineClient();
+      const preferredSide = elements.humanSideSelect.value;
+      const playerName = this.getPlayerName();
+      elements.onlinePlayerName.value = playerName;
+      client.joinRoom(roomCode, this.buildOnlineProfile(), {
+        preferredSide
+      });
+      elements.onlineStatusLine.textContent = `Joining room ${roomCode}...`;
+    } catch (error) {
+      this.pushToast({
+        title: "Online Match",
+        message: error.message || "The live room service is unavailable right now.",
+        tone: "warning",
+        duration: 2600
+      });
+    }
+  }
+
+  leaveOnlineRoom(message = "You left the online match.") {
+    if (this.online.client?.roomCode) {
+      this.online.client.leaveRoom();
+    } else {
+      this.closeOnlineSession(message);
+      this.render();
+    }
   }
 
   cloneStateForAi(state) {
@@ -435,12 +666,27 @@ class BaghChalApp {
     });
   }
 
-  applyModeState() {
+  applyModeState({ previousMode = this.mode, preserveOnlineRoom = false } = {}) {
     const isAiMode = this.mode === "ai";
+    const isOnlineMode = this.mode === "online";
+    elements.difficultyField.hidden = !isAiMode;
     elements.difficultySelect.disabled = !isAiMode;
-    elements.humanSideSelect.disabled = !isAiMode;
+    elements.sideField.hidden = this.mode === "local";
+    elements.humanSideSelect.disabled = this.mode === "local";
+    elements.sideFieldLabel.textContent = isOnlineMode ? "Preferred Side" : "Human Side";
+    elements.onlineFields.hidden = !isOnlineMode;
     elements.modeNote.textContent = modeNotes[this.mode];
+
+    if (previousMode === "online" && !isOnlineMode && !preserveOnlineRoom) {
+      this.closeOnlineSession("Returned to local board control.");
+    }
+
     this.clearTransientState();
+
+    if (isOnlineMode && !preserveOnlineRoom) {
+      this.state = createInitialState();
+      this.lastWinnerAnnounced = null;
+    }
 
     this.render();
     this.scheduleAiTurnIfNeeded();
@@ -515,6 +761,17 @@ class BaghChalApp {
   }
 
   resetGame() {
+    if (this.mode === "online" && this.online.client?.roomCode) {
+      this.online.client.requestReset();
+      this.pushToast({
+        title: "Reset Requested",
+        message: "Starting a fresh live match on the shared board.",
+        tone: "info",
+        duration: 1800
+      });
+      return;
+    }
+
     this.state = createInitialState();
     this.effects = [];
     this.toasts = [];
@@ -589,6 +846,10 @@ class BaghChalApp {
       return true;
     }
 
+    if (this.mode === "online") {
+      return Boolean(this.online.roomState?.localCanAct);
+    }
+
     return this.state.turn === this.humanSide;
   }
 
@@ -651,6 +912,21 @@ class BaghChalApp {
     this.render();
     this.announceWinnerIfNeeded();
     this.scheduleAiTurnIfNeeded();
+  }
+
+  submitResolvedAction(action) {
+    if (!action) {
+      return;
+    }
+
+    if (this.mode === "online") {
+      this.selectedPieceId = null;
+      this.online.client?.submitAction(action);
+      this.render();
+      return;
+    }
+
+    this.commitAction(action);
   }
 
   spawnCaptureEffect(position) {
@@ -762,7 +1038,7 @@ class BaghChalApp {
         .find((action) => action.type === "place" && action.to === position);
 
       if (placement) {
-        this.commitAction(placement);
+        this.submitResolvedAction(placement);
       }
       return;
     }
@@ -775,7 +1051,7 @@ class BaghChalApp {
       .find((candidate) => candidate.to === position);
 
     if (action) {
-      this.commitAction(action);
+      this.submitResolvedAction(action);
       return;
     }
 
@@ -908,14 +1184,26 @@ class BaghChalApp {
     const tigerMobility = countTigerMobility(this.state);
     const selectedPiece = this.selectedPieceId ? this.state.pieces[this.selectedPieceId] : null;
     const selectedMoves = selectedPiece ? getActionsForSelection(this.state, selectedPiece.id) : [];
-    const aiDescriptor = this.mode === "ai"
+    const isOnlineMode = this.mode === "online";
+    const onlineDescriptor = !this.online.roomCode
+      ? "Online match not connected yet"
+      : this.online.roomState?.waitingForOpponent
+        ? `Team ${this.online.roomCode} - waiting for ${formatSide(this.online.localSide === "goat" ? "tiger" : "goat")}`
+        : `Team ${this.online.roomCode} - You play ${formatSide(this.online.localSide)}`;
+    const descriptor = this.mode === "ai"
       ? `${this.difficulty[0].toUpperCase()}${this.difficulty.slice(1)} AI - Human plays ${this.humanSide === "goat" ? "Goats" : "Tigers"}`
-      : "Local duel on this device";
+      : isOnlineMode
+        ? onlineDescriptor
+        : "Local duel on this device";
+
+    if (elements.onlineRoomBadge) {
+      elements.onlineRoomBadge.textContent = this.online.roomCode || "Not connected";
+    }
 
     elements.turnBadge.textContent = this.state.turn === "goat" ? "Goats Turn" : "Tigers Turn";
     elements.turnBadge.className = `turn-badge ${this.state.turn === "goat" ? "goat-turn" : "tiger-turn"}`;
     elements.phaseLabel.textContent = this.state.phase === "placement" ? "Placement Phase" : "Movement Phase";
-    elements.aiStatus.textContent = this.aiPending ? `${aiDescriptor} - Thinking...` : aiDescriptor;
+    elements.aiStatus.textContent = this.aiPending ? `${descriptor} - Thinking...` : descriptor;
     elements.goatsPlacedValue.textContent = `${goatsPlaced} / ${TOTAL_GOATS}`;
     elements.goatsCapturedValue.textContent = `${goatsCaptured} / ${TIGER_WIN_CAPTURES}`;
     elements.goatsReserveValue.textContent = String(goatsReserve);
@@ -926,6 +1214,8 @@ class BaghChalApp {
       elements.selectionLabel.textContent = selectedMoves.length
         ? `${selectedPiece.type === "tiger" ? "Tiger" : "Goat"} at ${position.label} - ${selectedMoves.length} moves`
         : `${selectedPiece.type === "tiger" ? "Tiger" : "Goat"} at ${position.label} - trapped`;
+    } else if (isOnlineMode && this.online.roomState?.waitingForOpponent) {
+      elements.selectionLabel.textContent = "Waiting for the second player to join the live board.";
     } else if (this.state.turn === "goat" && this.state.phase === "placement" && this.canHumanAct()) {
       elements.selectionLabel.textContent = "Placement phase - choose any empty point.";
     } else {
@@ -934,20 +1224,33 @@ class BaghChalApp {
 
     if (this.state.winner === "goat") {
       elements.goalLabel.textContent = "The tigers are caged. The village wins.";
-      elements.statusLine.textContent = "All four tigers are blocked. Start a new match to play again.";
+      elements.statusLine.textContent = isOnlineMode
+        ? "All four tigers are blocked. Use New Match to restart the shared board."
+        : "All four tigers are blocked. Start a new match to play again.";
       elements.winnerBanner.classList.remove("hidden");
       elements.winnerTitle.textContent = "Goats Win";
       elements.winnerText.textContent = "Every tiger is trapped and the board belongs to the herd.";
     } else if (this.state.winner === "tiger") {
       elements.goalLabel.textContent = "The hunt is over. Five goats were captured.";
-      elements.statusLine.textContent = "Tigers claimed five goats. Start a new match to challenge them again.";
+      elements.statusLine.textContent = isOnlineMode
+        ? "Tigers claimed five goats. Use New Match to restart the shared board."
+        : "Tigers claimed five goats. Start a new match to challenge them again.";
       elements.winnerBanner.classList.remove("hidden");
       elements.winnerTitle.textContent = "Tigers Win";
       elements.winnerText.textContent = "The tigers have captured enough goats to break the defense.";
     } else {
       elements.winnerBanner.classList.add("hidden");
 
-      if (this.state.turn === "goat") {
+      if (isOnlineMode && this.online.roomState?.waitingForOpponent) {
+        const openSide = this.online.localSide === "goat" ? "Tigers" : "Goats";
+        elements.goalLabel.textContent = "Share the team code so the second player can join.";
+        elements.statusLine.textContent = `Waiting for the ${openSide} player to join room ${this.online.roomCode}.`;
+      } else if (isOnlineMode && !this.canHumanAct()) {
+        elements.goalLabel.textContent = this.state.turn === "goat"
+          ? "Goats are on move. Read the lines and wait for your turn."
+          : "Tigers are on move. Read the board and wait for your turn.";
+        elements.statusLine.textContent = this.online.roomState?.roomNotice || `Waiting for ${formatSide(this.state.turn)} to move.`;
+      } else if (this.state.turn === "goat") {
         if (this.state.phase === "placement") {
           elements.goalLabel.textContent = "Place goats on strong junctions and choke the tiger lanes.";
           elements.statusLine.textContent = this.aiPending
@@ -965,6 +1268,7 @@ class BaghChalApp {
           ? "The AI is reading the board."
           : "Tap a tiger, then tap a glowing destination or capture jump.";
       }
+
     }
 
     elements.moveLog.innerHTML = this.state.log.map((entry) => `
@@ -986,7 +1290,7 @@ class BaghChalApp {
     return JSON.stringify({
       coordinateSystem: "origin top-left, x increases right, y increases down",
       mode: this.mode,
-      difficulty: this.mode === "ai" ? this.difficulty : "local",
+      difficulty: this.mode === "ai" ? this.difficulty : this.mode,
       turn: this.state.turn,
       phase: this.state.phase,
       goatsPlaced: this.state.goatsPlaced,
@@ -996,6 +1300,9 @@ class BaghChalApp {
       tigerAdvantage: evaluateTigerAdvantage(this.state),
       winner: this.state.winner,
       aiPending: this.aiPending,
+      onlineRoomCode: this.online.roomCode,
+      onlineLocalSide: this.online.localSide,
+      onlineWaitingForOpponent: Boolean(this.online.roomState?.waitingForOpponent),
       selectedPieceId: this.selectedPieceId,
       highlightedMoves: this.getVisibleActions().map((action) => ({
         type: action.type,
